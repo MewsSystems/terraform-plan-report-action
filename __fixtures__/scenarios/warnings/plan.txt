@@ -1,0 +1,21 @@
+No changes. Your infrastructure matches the configuration.
+╷
+│ Warning: Argument is deprecated
+│
+│   with azurerm_eventhub.events,
+│   on main.tf line 12, in resource "azurerm_eventhub" "events":
+│   12:   namespace_name = azurerm_eventhub_namespace.this.name
+│
+│ namespace_name has been deprecated in favour of namespace_id and will be
+│ removed in v5.0 of the AzureRM Provider
+╵
+╷
+│ Warning: Argument is deprecated
+│
+│   with azurerm_eventhub.dlq,
+│   on main.tf line 24, in resource "azurerm_eventhub" "dlq":
+│   24:   namespace_name = azurerm_eventhub_namespace.this.name
+│
+│ namespace_name has been deprecated in favour of namespace_id and will be
+│ removed in v5.0 of the AzureRM Provider
+╵

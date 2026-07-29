@@ -1,0 +1,56 @@
+name: 'Terraform Plan Report'
+description:
+  'Aggregate N Terraform stack plans into one report: a sticky PR comment that
+  links to the full report in the run job summary.'
+author: 'Mews'
+
+branding:
+  icon: file-text
+  color: purple
+
+inputs:
+  plans-dir:
+    description:
+      'Directory of downloaded plan artifacts, one subdirectory per stack (the
+      layout actions/download-artifact produces). Each subdirectory must contain
+      meta.json (with a string "stack" field naming the stack), plan.txt, and
+      plan.json. This is the sole source of stacks.'
+    required: true
+  show:
+    description:
+      'Comma-separated native sections to render, in order. Any of: summary,
+      plan, warnings, errors.'
+    required: false
+    default: 'summary,plan,warnings,errors'
+  sections-dir:
+    description:
+      'Optional directory of custom-section JSON files (one per section per
+      stack). Each file: section, title, order, stack, markdown (required);
+      status, label, table_column (optional). Rendered as a Checks table +
+      detail blocks. Absent = Terraform-native report only.'
+    required: false
+  github-token:
+    description: 'Token used to upsert the sticky PR comment.'
+    required: false
+    default: ${{ github.token }}
+  comment-marker:
+    description: 'Hidden marker used to find and update the single comment.'
+    required: false
+    default: '<!-- tf-plan-report -->'
+
+outputs:
+  has-destroys:
+    description: 'true if any stack destroys (plan-derived).'
+  has-replaces:
+    description: 'true if any stack replaces (plan-derived).'
+  failed-stacks:
+    description: 'Count of stacks whose plan failed.'
+  comment-id:
+    description:
+      'The upserted comment id (empty when not run on a pull request).'
+  summary-url:
+    description: "Link to the run's job summary (the full report)."
+
+runs:
+  using: node24
+  main: dist/index.js

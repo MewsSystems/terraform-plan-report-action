@@ -1,0 +1,15 @@
+Terraform used the selected providers to generate the following execution plan.
+Resource actions are indicated with the following symbols:
+  ~ forget (remove from state without destroying)
+
+Terraform will perform the following actions:
+
+  # azurerm_storage_account.orphan will be removed from the Terraform state
+  # (the physical resource will not be destroyed)
+  ~ resource "azurerm_storage_account" "orphan" {
+        id   = "/subscriptions/0000/resourceGroups/rg-main/providers/Microsoft.Storage/storageAccounts/storphan"
+        name = "storphan"
+        # (all other attributes unchanged)
+    }
+
+Plan: 0 to add, 0 to change, 0 to destroy, 1 to remove from state.

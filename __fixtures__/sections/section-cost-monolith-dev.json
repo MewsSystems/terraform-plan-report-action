@@ -1,0 +1,15 @@
+{
+  "section": "cost",
+  "title": "Cost",
+  "order": 20,
+  "stack": "monolith-dev",
+  "status": "warn",
+  "label": "$340/mo",
+  "table_column": true,
+  "markdown": "| Resource | Monthly |\n|---|---|\n| azurerm_storage_account.uploads | $340 |",
+  "legend": {
+    "pass": "no monthly increase",
+    "warn": "cost goes up",
+    "fail": "large increase"
+  }
+}

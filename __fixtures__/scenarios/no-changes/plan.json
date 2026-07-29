@@ -1,0 +1,13 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "azurerm_resource_group.main",
+      "change": { "actions": ["no-op"] }
+    },
+    {
+      "address": "azurerm_container_app.api",
+      "change": { "actions": ["no-op"] }
+    }
+  ]
+}

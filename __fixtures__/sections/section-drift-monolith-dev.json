@@ -1,0 +1,13 @@
+{
+  "section": "drift",
+  "title": "Drift",
+  "order": 30,
+  "stack": "monolith-dev",
+  "status": "pass",
+  "table_column": false,
+  "markdown": "No drift detected against live infrastructure.",
+  "legend": {
+    "pass": "no drift",
+    "warn": "drift detected"
+  }
+}

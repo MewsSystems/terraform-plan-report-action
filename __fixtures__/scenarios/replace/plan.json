@@ -1,0 +1,13 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "azurerm_eventhub.events",
+      "change": { "actions": ["delete", "create"] }
+    },
+    {
+      "address": "azurerm_container_app.api",
+      "change": { "actions": ["create", "delete"] }
+    }
+  ]
+}

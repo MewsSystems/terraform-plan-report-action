@@ -1,0 +1,19 @@
+No changes. Your infrastructure matches the configuration.
+
+Warning: Check block assertion failed
+
+  on main.tf line 26, in check "owner_tag_required":
+  26:     condition     = try(azurerm_resource_group.main.tags["owner"], "") != ""
+    ├────────────────
+    │ azurerm_resource_group.main.tags is empty map of string
+
+Resource group rg-tf-test-test is missing required tag: owner.
+
+Warning: Check block assertion failed
+
+  on main.tf line 33, in check "environment_tag_required":
+  33:     condition     = try(azurerm_resource_group.main.tags["environment"], "") != ""
+    ├────────────────
+    │ azurerm_resource_group.main.tags is empty map of string
+
+Resource group rg-tf-test-test is missing required tag: environment.

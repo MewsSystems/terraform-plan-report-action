@@ -1,0 +1,18 @@
+Terraform used the selected providers to generate the following execution plan.
+Resource actions are indicated with the following symbols:
+
+Terraform will perform the following actions:
+
+  # azurerm_virtual_network.main has moved to module.networking.azurerm_virtual_network.main
+    resource "azurerm_virtual_network" "main" {
+        id   = "/subscriptions/0000/resourceGroups/rg-main/providers/Microsoft.Network/virtualNetworks/vnet-main"
+        name = "vnet-main"
+    }
+
+  # azurerm_subnet.default has moved to module.networking.azurerm_subnet.default
+    resource "azurerm_subnet" "default" {
+        id   = "/subscriptions/0000/resourceGroups/rg-main/providers/Microsoft.Network/virtualNetworks/vnet-main/subnets/default"
+        name = "default"
+    }
+
+Plan: 0 to add, 0 to change, 0 to destroy, 2 to move.
