@@ -1,0 +1,66 @@
+# This workflow will lint the entire codebase using the
+# `super-linter/super-linter` action.
+#
+# For more information, see the super-linter repository:
+#     https://github.com/super-linter/super-linter
+name: Lint Codebase
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: read
+  statuses: write
+
+jobs:
+  lint:
+    name: Lint Codebase
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        id: setup-node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install Dependencies
+        id: install
+        run: npm ci
+
+      - name: Lint Codebase
+        id: super-linter
+        uses: super-linter/super-linter/slim@4ce20838b8ab83717e78138c5b3a1407148e0918 # v8
+        env:
+          CHECKOV_FILE_NAME: .checkov.yml
+          DEFAULT_BRANCH: main
+          # Exclude generated files: bundled dist, the npm lockfile (hash
+          # substrings trip codespell false positives on every dep bump), and
+          # CHANGELOG.md (release-please owns its format).
+          FILTER_REGEX_EXCLUDE: (dist/.*|.*package-lock\.json|CHANGELOG\.md)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LINTER_RULES_PATH: .
+          VALIDATE_ALL_CODEBASE: true
+          VALIDATE_BIOME_FORMAT: false
+          VALIDATE_BIOME_LINT: false
+          VALIDATE_GITHUB_ACTIONS_ZIZMOR: false
+          VALIDATE_JAVASCRIPT_ES: false
+          VALIDATE_JSCPD: false
+          VALIDATE_TYPESCRIPT_ES: false
+          VALIDATE_JSON: false
+          # Default terminology dictionary flags prose like "repo"/"markdown" on
+          # internal docs; low value here and one suggestion is itself a typo.
+          VALIDATE_NATURAL_LANGUAGE: false

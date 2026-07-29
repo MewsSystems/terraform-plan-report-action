@@ -1,0 +1,19 @@
+Terraform used the selected providers to generate the following execution plan.
+Resource actions are indicated with the following symbols:
+-/+ destroy and then create replacement
++/- create replacement and then destroy
+
+Terraform will perform the following actions:
+
+  # azurerm_eventhub.events must be replaced
+-/+ resource "azurerm_eventhub" "events" {
+      ~ partition_count = 2 -> 8 # forces replacement
+        name            = "evh-events"
+    }
+
+  # azurerm_container_app.api must be replaced
++/- resource "azurerm_container_app" "api" {
+      ~ name = "ca-api-old" -> "ca-api" # forces replacement
+    }
+
+Plan: 2 to add, 0 to change, 2 to destroy.

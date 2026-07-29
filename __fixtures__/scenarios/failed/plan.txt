@@ -1,0 +1,9 @@
+╷
+│ Error: Invalid resource type
+│
+│   on main.tf line 5, in resource "azurerm_does_not_exist" "oops":
+│    5: resource "azurerm_does_not_exist" "oops" {
+│
+│ The provider hashicorp/azurerm does not support resource type
+│ "azurerm_does_not_exist".
+╵

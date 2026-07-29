@@ -1,0 +1,13 @@
+{
+  "section": "tags",
+  "title": "Tags",
+  "order": 10,
+  "stack": "monolith-prod",
+  "status": "pass",
+  "table_column": true,
+  "markdown": "All planned `azurerm_*` resources match tag registry `v1.18.0`.",
+  "legend": {
+    "pass": "all required tags present",
+    "fail": "missing or invalid tags"
+  }
+}

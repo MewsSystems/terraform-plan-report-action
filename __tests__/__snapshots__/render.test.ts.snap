@@ -1,0 +1,93 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`renderComment is compact: table and link, no per-stack plan bodies 1`] = `
+"## Terraform Plan · tf-domain-foundations
+
+1 stack · **1/1 planned OK**
+
+### Terraform operations
+
+| Stack | Status |
+| --- | --- |
+| a | ✅ no changes |
+
+**What the plan result means:** ✅ planned OK
+
+_**[Full report →](https://github.com/MewsSystems/tf-domain-foundations/actions/runs/42)** · updated for commit [\`fe9f7f8\`](https://github.com/MewsSystems/tf-domain-foundations/commit/fe9f7f8abc123) · [usage docs](https://github.com/MewsSystems/terraform-plan-report-action#reading-the-report)_"
+`;
+
+exports[`renderFullReport matches the snapshot for all native sections 1`] = `
+"# Terraform Plan · tf-domain-foundations
+
+4 stacks · **3/4 planned OK** · ⚠️ 1 warning (1 stack) · ❌ 1 failed
+
+## Terraform operations
+
+| Stack | add | replace | Plan |
+| --- | --- | --- | --- |
+| distribution (dev) | 0 | 0 | ✅ |
+| fintech (dev) | 0 | 0 | ⚠️ 1 |
+| core (prod) | 1 | **1** | ✅ |
+| broken (dev) | — | — | ❌ |
+
+> [!CAUTION]
+> **\`1 replace (destroy+create)\`** — these operations permanently delete resources
+
+### Errors
+
+<details><summary>broken (dev)</summary>
+
+\`\`\`
+Error: boom
+\`\`\`
+
+</details>
+
+### Warnings (1 across 1 stack)
+
+<details><summary>fintech (dev) · 1 warning</summary>
+
+\`\`\`
+Warning: Argument is deprecated
+\`\`\`
+
+</details>
+
+### Plan details
+
+<details><summary>distribution (dev) · ✅ no changes</summary>
+
+\`\`\`
+No changes.
+\`\`\`
+
+</details>
+
+<details><summary>fintech (dev) · ⚠️ 1 warning</summary>
+
+\`\`\`
+No changes.
+\`\`\`
+
+</details>
+
+<details><summary>core (prod) · 1 add · 1 replace (destroy+create)</summary>
+
+\`\`\`
+Plan: 1 to add, 0 to change, 1 to replace.
+\`\`\`
+
+</details>
+
+<details><summary>broken (dev) · ❌ plan failed</summary>
+
+\`\`\`
+Error: boom
+\`\`\`
+
+</details>
+
+---
+
+_updated for commit [\`fe9f7f8\`](https://github.com/MewsSystems/tf-domain-foundations/commit/fe9f7f8abc123) · [usage docs](https://github.com/MewsSystems/terraform-plan-report-action#reading-the-report)_"
+`;

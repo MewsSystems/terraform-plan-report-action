@@ -1,0 +1,17 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "azurerm_resource_group.existing",
+      "change": { "actions": ["create"] },
+      "importing": { "id": "/subscriptions/0000/resourceGroups/rg-existing" }
+    },
+    {
+      "address": "azurerm_key_vault.shared",
+      "change": { "actions": ["create"] },
+      "importing": {
+        "id": "/subscriptions/0000/resourceGroups/rg-existing/providers/Microsoft.KeyVault/vaults/kv-shared"
+      }
+    }
+  ]
+}

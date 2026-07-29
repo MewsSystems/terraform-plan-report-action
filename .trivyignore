@@ -1,0 +1,9 @@
+# undici CVEs with no upstream fix as of 2026-06-30.
+# All are DoS variants (no RCE, no data exposure). Risk accepted for a CI-only action.
+# Revisit when undici releases patches.
+CVE-2026-1525
+CVE-2026-1527
+CVE-2026-1528
+CVE-2026-2229
+CVE-2026-6733
+CVE-2026-11525
