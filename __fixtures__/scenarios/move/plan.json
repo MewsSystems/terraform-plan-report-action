@@ -1,0 +1,23 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "module.networking.azurerm_virtual_network.main",
+      "change": { "actions": ["no-op"] }
+    },
+    {
+      "address": "module.networking.azurerm_subnet.default",
+      "change": { "actions": ["no-op"] }
+    }
+  ],
+  "moved": [
+    {
+      "previous_address": "azurerm_virtual_network.main",
+      "address": "module.networking.azurerm_virtual_network.main"
+    },
+    {
+      "previous_address": "azurerm_subnet.default",
+      "address": "module.networking.azurerm_subnet.default"
+    }
+  ]
+}

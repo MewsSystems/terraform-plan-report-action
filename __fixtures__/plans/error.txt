@@ -1,0 +1,6 @@
+╷
+│ Error: Invalid resource type
+│
+│ The provider hashicorp/azurerm does not support resource type
+│ "azurerm_does_not_exist".
+╵

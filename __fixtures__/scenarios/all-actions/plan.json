@@ -1,0 +1,45 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "azurerm_storage_account.uploads",
+      "change": { "actions": ["create"] }
+    },
+    {
+      "address": "azurerm_container_app.api",
+      "change": { "actions": ["create"] }
+    },
+    {
+      "address": "azurerm_resource_group.main",
+      "change": { "actions": ["update"] }
+    },
+    {
+      "address": "azurerm_key_vault.legacy",
+      "change": { "actions": ["delete"] }
+    },
+    {
+      "address": "azurerm_eventhub.events",
+      "change": { "actions": ["delete", "create"] }
+    },
+    {
+      "address": "azurerm_container_app.worker",
+      "change": { "actions": ["create", "delete"] }
+    },
+    {
+      "address": "azurerm_resource_group.existing",
+      "change": {
+        "actions": ["no-op"],
+        "importing": { "id": "/subscriptions/0000/resourceGroups/rg-existing" }
+      }
+    },
+    {
+      "address": "azurerm_storage_account.orphan",
+      "change": { "actions": ["forget"] }
+    },
+    {
+      "address": "module.networking.azurerm_virtual_network.main",
+      "previous_address": "azurerm_virtual_network.main",
+      "change": { "actions": ["no-op"] }
+    }
+  ]
+}

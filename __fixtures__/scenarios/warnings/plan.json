@@ -1,0 +1,10 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "azurerm_eventhub.events",
+      "change": { "actions": ["no-op"] }
+    },
+    { "address": "azurerm_eventhub.dlq", "change": { "actions": ["no-op"] } }
+  ]
+}

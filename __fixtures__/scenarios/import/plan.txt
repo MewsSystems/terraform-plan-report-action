@@ -1,0 +1,20 @@
+Terraform used the selected providers to generate the following execution plan.
+Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will import the following resources:
+
+  # azurerm_resource_group.existing will be imported
+    resource "azurerm_resource_group" "existing" {
+        id       = "/subscriptions/0000/resourceGroups/rg-existing"
+        location = "westeurope"
+        name     = "rg-existing"
+    }
+
+  # azurerm_key_vault.shared will be imported
+    resource "azurerm_key_vault" "shared" {
+        id   = "/subscriptions/0000/resourceGroups/rg-existing/providers/Microsoft.KeyVault/vaults/kv-shared"
+        name = "kv-shared"
+    }
+
+Plan: 2 to import, 0 to add, 0 to change, 0 to destroy.

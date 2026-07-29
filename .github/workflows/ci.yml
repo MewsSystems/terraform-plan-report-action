@@ -1,0 +1,87 @@
+name: Continuous Integration
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test-typescript:
+    name: TypeScript Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        id: setup-node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install Dependencies
+        id: npm-ci
+        run: npm ci
+
+      - name: Check Format
+        id: npm-format-check
+        run: npm run format:check
+
+      - name: Lint
+        id: npm-lint
+        run: npm run lint
+
+      - name: Test
+        id: npm-ci-test
+        run: npm run ci-test
+
+  test-action:
+    name: GitHub Actions Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v7
+
+      - name: Build plans-dir fixture
+        id: plans
+        run: |
+          # Mimic the actions/download-artifact layout: one subdir per stack,
+          # each with meta.json + plan.txt (+ plan.json when the plan succeeded).
+          # "broken (dev)" has no plan.json — exercises the failed-plan path.
+          build() {
+            dir="plans/$1"; mkdir -p "$dir"
+            printf '{"stack":"%s"}\n' "$2" > "$dir/meta.json"
+            cp "__fixtures__/plans/$3.txt" "$dir/plan.txt"
+            if [ -f "__fixtures__/plans/$3.json" ]; then
+              cp "__fixtures__/plans/$3.json" "$dir/plan.json"
+            fi
+          }
+          build monolith-dev  "monolith (dev)"  changes
+          build monolith-prod "monolith (prod)" nochange
+          build broken-dev    "broken (dev)"    error
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          plans-dir: plans
+          show: summary,plan,warnings,errors
+          github-token: ''
+
+      - name: Print Outputs
+        id: output
+        run: |
+          echo "has-destroys=${{ steps.test-action.outputs.has-destroys }}"
+          echo "has-replaces=${{ steps.test-action.outputs.has-replaces }}"
+          echo "failed-stacks=${{ steps.test-action.outputs.failed-stacks }}"

@@ -1,0 +1,43 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # need full history + tags to move the major/minor aliases
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # Optional: use a PAT so the release PR triggers CI (GITHUB_TOKEN-created
+          # PRs don't). token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      # release-please tags vX.Y.Z but not the moving aliases GitHub Actions
+      # consumers pin (@v0, @v0.1). Force-move them to the new release.
+      - name: Move major/minor tag aliases
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          MAJOR: v${{ steps.release.outputs.major }}
+          MINOR:
+            v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor
+            }}
+          SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$MAJOR" "$SHA"
+          git tag -f "$MINOR" "$SHA"
+          git push -f origin "$MAJOR"
+          git push -f origin "$MINOR"

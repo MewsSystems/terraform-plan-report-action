@@ -1,0 +1,35 @@
+Terraform used the selected providers to generate the following execution plan.
+Resource actions are indicated with the following symbols:
+  + create
+  ~ update in-place
+  - destroy
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # azurerm_storage_account.new will be created
+  + resource "azurerm_storage_account" "new" {
+      + name                = "stnewexample"
+      + account_tier        = "Standard"
+      + account_replication = "LRS"
+    }
+
+  # azurerm_resource_group.main will be updated in-place
+  ~ resource "azurerm_resource_group" "main" {
+        id   = "/subscriptions/0000/resourceGroups/rg-main"
+      ~ tags = {
+          + "owner" = "platform-engineering"
+        }
+    }
+
+  # azurerm_key_vault.legacy will be destroyed
+  - resource "azurerm_key_vault" "legacy" {
+      - name = "kv-legacy" -> null
+    }
+
+  # azurerm_eventhub.bus must be replaced
+-/+ resource "azurerm_eventhub" "bus" {
+      ~ partition_count = 2 -> 4 # forces replacement
+    }
+
+Plan: 2 to add, 1 to change, 2 to destroy.
