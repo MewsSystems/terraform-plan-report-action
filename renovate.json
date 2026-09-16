@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>MewsSystems/renovate-config"],
+  "mode": "full",
+  "enabledManagers": ["npm", "github-actions", "nodenv"],
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "groupName": "npm dependencies"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions dependencies"
+    }
+  ],
+  "lockFileMaintenance": {
+    "description": "The preset labels this for Terraform; here it refreshes package-lock.json.",
+    "commitMessageTopic": "npm lock file",
+    "semanticCommitScope": "deps",
+    "labels": ["dependencies", "renovate", "lock-files"]
+  }
+}
