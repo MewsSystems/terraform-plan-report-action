@@ -1,4 +1,6 @@
 # Every change requires review from the owning team.
+# Moxly is a shared owner so an agentic review can satisfy the org's
+# code-owner requirement on low-risk changes.
 # See https://docs.github.com/articles/about-code-owners
 
-*   @MewsSystems/rnd-platform-cloudenablement
+*   @MewsSystems/rnd-platform-cloudenablement @moxly
