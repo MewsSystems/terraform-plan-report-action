@@ -21,6 +21,7 @@ jest.unstable_mockModule('@actions/core', () => ({ warning }))
 
 const { upsertComment, chooseCommentBody, MAX_COMMENT_LENGTH } =
   await import('../src/comment.js')
+const { MAX_PAYLOAD_LENGTH } = await import('../src/payload.js')
 
 const MARKER = '<!-- tf-plan-report -->'
 
@@ -118,5 +119,63 @@ describe('upsertComment', () => {
     expect(createComment).toHaveBeenCalledWith(
       expect.objectContaining({ body: `${MARKER}\n${huge}` })
     )
+  })
+
+  it('appends the payload as the last line of the body', async () => {
+    listComments.mockResolvedValueOnce({ data: [] })
+
+    await upsertComment(
+      'tok',
+      13,
+      MARKER,
+      'report',
+      'fallback',
+      '<!-- data -->'
+    )
+
+    expect(createComment).toHaveBeenCalledWith(
+      expect.objectContaining({ body: `${MARKER}\nreport\n\n<!-- data -->` })
+    )
+  })
+
+  it('keeps the payload when the body is swapped for the fallback', async () => {
+    listComments.mockResolvedValueOnce({ data: [] })
+    const huge = 'x'.repeat(MAX_COMMENT_LENGTH)
+
+    await upsertComment('tok', 13, MARKER, huge, 'too big', '<!-- data -->')
+
+    expect(createComment).toHaveBeenCalledWith(
+      expect.objectContaining({ body: `${MARKER}\ntoo big\n\n<!-- data -->` })
+    )
+  })
+
+  it('reserves room for the payload so the posted body stays within the cap', async () => {
+    listComments.mockResolvedValueOnce({ data: [] })
+    const payload = `<!-- ${'p'.repeat(100)} -->`
+    const fitsWithoutPayload = 'x'.repeat(
+      MAX_COMMENT_LENGTH - MARKER.length - 1
+    )
+
+    await upsertComment('tok', 13, MARKER, fitsWithoutPayload, 'fb', payload)
+
+    const calls = createComment.mock.calls as unknown as [{ body: string }][]
+    const posted = calls[0][0].body
+    expect(posted).toBe(`${MARKER}\nfb\n\n${payload}`)
+    expect(posted.length).toBeLessThanOrEqual(MAX_COMMENT_LENGTH)
+  })
+
+  it('never exceeds the cap in the worst case: oversized body, largest payload, fallback', async () => {
+    listComments.mockResolvedValueOnce({ data: [] })
+    const payload = `<!-- ${'p'.repeat(MAX_PAYLOAD_LENGTH - 9)} -->`
+    expect(payload).toHaveLength(MAX_PAYLOAD_LENGTH)
+    const huge = 'x'.repeat(MAX_COMMENT_LENGTH)
+    const fallback = 'f'.repeat(5000)
+
+    await upsertComment('tok', 13, MARKER, huge, fallback, payload)
+
+    const calls = createComment.mock.calls as unknown as [{ body: string }][]
+    const posted = calls[0][0].body
+    expect(posted).toContain(payload)
+    expect(posted.length).toBeLessThanOrEqual(MAX_COMMENT_LENGTH)
   })
 })

@@ -93,6 +93,8 @@ export interface StackResult {
   failed: boolean
   /** Exact counts from plan_json, or null when the stack failed to plan. */
   counts: PlanCounts | null
+  replaced: string[]
+  destroyed: string[]
   /** Raw `terraform show -no-color` text, for the per-stack plan block. */
   planText: string
   /** Cleaned Terraform warning diagnostics. */

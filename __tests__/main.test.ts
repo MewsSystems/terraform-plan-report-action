@@ -4,6 +4,7 @@
  */
 import { jest } from '@jest/globals'
 import * as core from '../__fixtures__/core.js'
+import { PAYLOAD_EXTRACT_SOURCE } from '../__fixtures__/payload.js'
 
 jest.unstable_mockModule('@actions/core', () => core)
 
@@ -73,8 +74,19 @@ describe('run', () => {
       13,
       '<!-- tf-plan-report -->',
       expect.stringContaining('Terraform Plan'),
-      expect.stringContaining('too large to render as a PR comment')
+      expect.stringContaining('too large to render as a PR comment'),
+      expect.stringMatching(new RegExp(`^${PAYLOAD_EXTRACT_SOURCE}$`))
     )
+    const payload = upsertComment.mock.calls[0][5] as string
+    const data = JSON.parse(
+      new RegExp(PAYLOAD_EXTRACT_SOURCE).exec(payload)![1]
+    )
+    expect(data.schema).toBe(1)
+    expect(data.commit).toBe('deadbeef000')
+    expect(data.stacks.map((s: { stack: string }) => s.stack)).toEqual([
+      'monolith-dev',
+      'monolith-prod'
+    ])
     expect(core.setOutput).toHaveBeenCalledWith('comment-id', '999')
   })
 

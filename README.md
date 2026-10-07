@@ -76,6 +76,48 @@ additively (`order`, `priority`, …) later without changing anything else.
 > `terraform show` on a saved plan file silently drops check-block warnings; the
 > live output preserves them.
 
+### Machine-readable payload
+
+The last line of the sticky comment is a hidden HTML comment, invisible when
+rendered, that carries the plan outcome as JSON. It is a contract for automated
+consumers: read it instead of parsing the markdown.
+
+```text
+<!-- tf-plan-report:data {"schema":1,"commit":"<sha>","stacks":[...]} -->
+```
+
+| Field                | Meaning                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `schema`             | Payload version (`1`). Fields are only added within a version.                                                      |
+| `commit`             | PR head SHA at render time (not the merge commit that was planned).                                                 |
+| `stacks[].stack`     | Stack name from `meta.json`.                                                                                        |
+| `stacks[].failed`    | `true` when the plan failed or its `plan.json` was unreadable; counts are then empty. Absent when false.            |
+| `stacks[].counts`    | Non-zero ops only: `add`, `change`, `destroy`, `replace`, `import`, `forget`, `move`.                               |
+| `stacks[].replaced`  | Addresses of replaced resources. Absent when empty.                                                                 |
+| `stacks[].destroyed` | Addresses of delete-only resources (replacements are in `replaced`, not both). Absent when empty.                   |
+| `stacks[].truncated` | `true` when a stack's lists were capped at 100 each, or dropped to fit the payload size budget (20,000 characters). |
+| `omitted`            | `true`, with no `stacks`, when even the list-free payload exceeds the size budget. Treat it as unreadable.          |
+
+An absent count is 0, an absent `failed` is false, and an absent list is empty.
+List lengths can be below the counts: resources without an address are skipped
+and lists cap at 100. If the payload still doesn't fit the budget with the lists
+dropped, the line carries only `schema`, `commit` and `omitted: true`, and the
+job logs a warning. No line at all means an older version of this action.
+
+`>`, `--`, U+2028 and U+2029 are written as unicode escapes so a resource
+address cannot close the comment; `JSON.parse` returns the original text.
+
+Read it only from the comment written by the identity that runs this action
+(usually `github-actions[bot]`): anyone who can comment can post a lookalike.
+Within that comment, take the payload anchored to the end of the body. Plan
+warnings quoted earlier in the report are PR-author text and can contain a fake
+payload line.
+
+```js
+const match = /<!-- tf-plan-report:data (\{.*\}) -->\s*$/.exec(comment.body)
+const report = match && JSON.parse(match[1])
+```
+
 ## Content model
 
 1. **Terraform-native core** (opt-in via `show`): `summary`, `plan`, `warnings`,

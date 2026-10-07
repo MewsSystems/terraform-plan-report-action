@@ -1,4 +1,5 @@
 import {
+  analyzePlanJson,
   analyzeStack,
   cleanPlanText,
   countsFromPlanJson,
@@ -14,6 +15,29 @@ const zeroCounts = {
   forget: 0,
   move: 0
 }
+
+describe('analyzePlanJson', () => {
+  it('collects the addresses behind replace and destroy counts', () => {
+    const json = JSON.stringify({
+      resource_changes: [
+        { address: 'a.create', change: { actions: ['create'] } },
+        { address: 'a.destroy', change: { actions: ['delete'] } },
+        { address: 'a.replace', change: { actions: ['delete', 'create'] } },
+        { address: 'a.cbd', change: { actions: ['create', 'delete'] } },
+        { change: { actions: ['delete'] } }
+      ]
+    })
+    const result = analyzePlanJson(json)
+    expect(result.replaced).toEqual(['a.replace', 'a.cbd'])
+    expect(result.destroyed).toEqual(['a.destroy'])
+    expect(result.counts).toEqual({
+      ...zeroCounts,
+      add: 1,
+      destroy: 2,
+      replace: 2
+    })
+  })
+})
 
 describe('countsFromPlanJson', () => {
   it('counts add, change, destroy and replace from resource_changes', () => {
