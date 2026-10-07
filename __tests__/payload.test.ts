@@ -1,20 +1,24 @@
-import { analyzeStack } from '../src/plan.js'
-import {
-  MAX_LISTED_ADDRESSES,
-  PAYLOAD_MARKER,
-  renderPayload
-} from '../src/payload.js'
+import { readFileSync } from 'node:fs'
+import { jest } from '@jest/globals'
+import { PAYLOAD_EXTRACT_SOURCE } from '../__fixtures__/payload.js'
 import type { StackResult } from '../src/types.js'
 
-const COMMIT = 'deadbeef0000000000000000000000000000cafe'
-const PAYLOAD_RE = new RegExp(`^<!-- ${PAYLOAD_MARKER} (\\{.*\\}) -->$`)
+const warning = jest.fn()
+jest.unstable_mockModule('@actions/core', () => ({ warning }))
 
-function extract(payload: string): {
+const { analyzeStack } = await import('../src/plan.js')
+const { MAX_LISTED_ADDRESSES, MAX_PAYLOAD_LENGTH, renderPayload } =
+  await import('../src/payload.js')
+
+const COMMIT = 'deadbeef0000000000000000000000000000cafe'
+const PAYLOAD_RE = new RegExp(PAYLOAD_EXTRACT_SOURCE)
+
+function extract(payload: string | undefined): {
   schema: number
   commit: string
   stacks: Record<string, unknown>[]
 } {
-  const match = PAYLOAD_RE.exec(payload)
+  const match = payload === undefined ? null : PAYLOAD_RE.exec(payload)
   if (!match) throw new Error(`payload does not match marker: ${payload}`)
   return JSON.parse(match[1])
 }
@@ -117,6 +121,12 @@ describe('renderPayload', () => {
     })
   })
 
+  it('extracts with the exact regex the README documents', () => {
+    expect(readFileSync('README.md', 'utf8')).toContain(
+      `/${PAYLOAD_EXTRACT_SOURCE}/`
+    )
+  })
+
   it('round-trips addresses containing "-->" and "--" through an HTML comment', () => {
     const hostile = 'aws_x.a-->b--c---d<!--e'
     const payload = renderPayload(
@@ -158,5 +168,58 @@ describe('renderPayload', () => {
     expect(capped.destroyed).toEqual(many.slice(0, MAX_LISTED_ADDRESSES))
     expect(capped.truncated).toBe(true)
     expect(whole).not.toHaveProperty('truncated')
+  })
+
+  it('round-trips U+2028 and U+2029 so a regex extractor still matches', () => {
+    const address = 'res.a\u2028b\u2029c'
+
+    const payload = renderPayload(
+      [stackResult({ destroyed: [address] })],
+      COMMIT
+    )
+
+    expect(payload).not.toMatch(/[\u2028\u2029]/)
+    expect(extract(payload).stacks[0].destroyed).toEqual([address])
+  })
+
+  describe('size budget', () => {
+    const longAddress = (i: number): string => `module.m${i}.${'a'.repeat(120)}`
+    const bulky = (stacks: number): StackResult[] =>
+      Array.from({ length: stacks }, (_, s) =>
+        stackResult({
+          name: `stack-${s}`,
+          replaced: Array.from({ length: 100 }, (_, i) => longAddress(i)),
+          destroyed: Array.from({ length: 100 }, (_, i) => longAddress(i))
+        })
+      )
+
+    beforeEach(() => warning.mockClear())
+
+    it('drops the lists and flags every stack when 5 stacks x 200 long addresses overflow', () => {
+      const payload = renderPayload(bulky(5), COMMIT)
+
+      expect(payload!.length).toBeLessThanOrEqual(MAX_PAYLOAD_LENGTH)
+      const { stacks } = extract(payload)
+      expect(stacks).toHaveLength(5)
+      for (const stack of stacks) {
+        expect(stack).toMatchObject({
+          replaced: [],
+          destroyed: [],
+          truncated: true
+        })
+      }
+      expect(warning).not.toHaveBeenCalled()
+    })
+
+    it('omits the payload with a warning naming the size when even the compact form overflows', () => {
+      const stacks = Array.from({ length: 400 }, (_, i) =>
+        stackResult({ name: `stack-${i}-${'n'.repeat(60)}` })
+      )
+
+      expect(renderPayload(stacks, COMMIT)).toBeUndefined()
+      expect(warning).toHaveBeenCalledWith(
+        expect.stringMatching(/payload is \d+ chars/)
+      )
+    })
   })
 })

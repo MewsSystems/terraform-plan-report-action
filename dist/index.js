@@ -34410,7 +34410,6 @@ function cleanPlanText(text) {
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 }
-/** Counts plus the addresses behind the replace and destroy counts. */
 function analyzePlanJson(raw) {
     const json = JSON.parse(raw);
     const counts = {
@@ -35099,14 +35098,12 @@ function chooseCommentBody(marker, body, fallback, maxLength = MAX_COMMENT_LENGT
  *
  * An oversized report is swapped for `fallback` (see `chooseCommentBody`) so it
  * still posts a comment instead of failing the whole action. The plan detail
- * always lives in the job summary, so nothing is lost. The optional `payload`
- * is appended after that choice and reserved for in the cap, so it survives the
- * fallback swap.
+ * always lives in the job summary, so nothing is lost.
  */
 async function upsertComment(token, prNumber, marker, body, fallback, payload) {
     const octokit = getOctokit(token);
     const { owner, repo } = context.repo;
-    const payloadSuffix = payload === undefined ? '' : `\n${payload}`;
+    const payloadSuffix = payload === undefined ? '' : `\n\n${payload}`;
     const chosen = chooseCommentBody(marker, body, fallback, MAX_COMMENT_LENGTH - payloadSuffix.length);
     if (chosen.truncated) {
         warning(`Comment body is ${`${marker}\n${body}`.length} chars, over GitHub's ${MAX_COMMENT_LENGTH} cap; posting the compact fallback instead. See the job summary for the full report.`);
@@ -35150,6 +35147,7 @@ async function findComment(octokit, owner, repo, prNumber, marker) {
 const PAYLOAD_MARKER = 'tf-plan-report:data';
 const PAYLOAD_SCHEMA_VERSION = 1;
 const MAX_LISTED_ADDRESSES = 100;
+const MAX_PAYLOAD_LENGTH = 20000;
 const NO_COUNTS = {
     add: 0,
     change: 0,
@@ -35159,33 +35157,48 @@ const NO_COUNTS = {
     forget: 0,
     move: 0
 };
-function stackPayload(result) {
-    const truncated = result.replaced.length > MAX_LISTED_ADDRESSES ||
+function stackPayload(result, includeLists) {
+    const overCap = result.replaced.length > MAX_LISTED_ADDRESSES ||
         result.destroyed.length > MAX_LISTED_ADDRESSES;
+    const truncated = overCap || !includeLists;
+    const cap = includeLists ? MAX_LISTED_ADDRESSES : 0;
     return {
         stack: result.name,
         failed: result.failed,
         counts: result.counts ?? NO_COUNTS,
-        replaced: result.replaced.slice(0, MAX_LISTED_ADDRESSES),
-        destroyed: result.destroyed.slice(0, MAX_LISTED_ADDRESSES),
+        replaced: result.replaced.slice(0, cap),
+        destroyed: result.destroyed.slice(0, cap),
         ...(truncated && { truncated })
     };
 }
-/**
- * A hidden HTML comment carrying the plan outcome as JSON, for automated
- * consumers of the sticky comment. `>` and `--` runs are written as unicode
- * escapes because resource addresses are PR-author controlled and could
- * otherwise close the HTML comment early; JSON.parse restores them.
- */
-function renderPayload(results, commit) {
+function serialize(results, commit, includeLists) {
     const json = JSON.stringify({
         schema: PAYLOAD_SCHEMA_VERSION,
         commit,
-        stacks: results.map(stackPayload)
+        stacks: results.map((r) => stackPayload(r, includeLists))
     })
         .replace(/>/g, '\\u003e')
-        .replace(/-{2,}/g, (run) => '\\u002d'.repeat(run.length));
+        .replace(/-{2,}/g, (run) => '\\u002d'.repeat(run.length))
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029');
     return `<!-- ${PAYLOAD_MARKER} ${json} -->`;
+}
+/**
+ * Resource addresses are PR-author controlled and could close the HTML comment
+ * early, so `>` and `--` runs are written as unicode escapes.
+ *
+ * Returns undefined, with a warning, when even the lists-free payload exceeds
+ * MAX_PAYLOAD_LENGTH.
+ */
+function renderPayload(results, commit) {
+    const full = serialize(results, commit, true);
+    if (full.length <= MAX_PAYLOAD_LENGTH)
+        return full;
+    const compact = serialize(results, commit, false);
+    if (compact.length <= MAX_PAYLOAD_LENGTH)
+        return compact;
+    warning(`Machine-readable payload is ${compact.length} chars, over the ${MAX_PAYLOAD_LENGTH} budget even without address lists; omitting it from the comment.`);
+    return undefined;
 }
 
 /**

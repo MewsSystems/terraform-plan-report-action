@@ -33,9 +33,7 @@ export function chooseCommentBody(
  *
  * An oversized report is swapped for `fallback` (see `chooseCommentBody`) so it
  * still posts a comment instead of failing the whole action. The plan detail
- * always lives in the job summary, so nothing is lost. The optional `payload`
- * is appended after that choice and reserved for in the cap, so it survives the
- * fallback swap.
+ * always lives in the job summary, so nothing is lost.
  */
 export async function upsertComment(
   token: string,
@@ -47,7 +45,7 @@ export async function upsertComment(
 ): Promise<number> {
   const octokit = github.getOctokit(token)
   const { owner, repo } = github.context.repo
-  const payloadSuffix = payload === undefined ? '' : `\n${payload}`
+  const payloadSuffix = payload === undefined ? '' : `\n\n${payload}`
   const chosen = chooseCommentBody(
     marker,
     body,

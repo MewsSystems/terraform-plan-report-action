@@ -99,7 +99,6 @@ export function countsFromPlanJson(raw: string): PlanCounts {
   return analyzePlanJson(raw).counts
 }
 
-/** Counts plus the addresses behind the replace and destroy counts. */
 export function analyzePlanJson(raw: string): {
   counts: PlanCounts
   replaced: string[]

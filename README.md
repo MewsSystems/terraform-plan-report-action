@@ -86,19 +86,23 @@ consumers: read it instead of parsing the markdown.
 <!-- tf-plan-report:data {"schema":1,"commit":"<sha>","stacks":[...]} -->
 ```
 
-| Field                | Meaning                                                             |
-| -------------------- | ------------------------------------------------------------------- |
-| `schema`             | Payload version (`1`). Fields are only added within a version.      |
-| `commit`             | Full SHA the report was rendered for.                               |
-| `stacks[].stack`     | Stack name from `meta.json`.                                        |
-| `stacks[].failed`    | `true` when the stack failed to plan; its counts are then all zero. |
-| `stacks[].counts`    | `add`, `change`, `destroy`, `replace`, `import`, `forget`, `move`.  |
-| `stacks[].replaced`  | Addresses of replaced resources (at most 100).                      |
-| `stacks[].destroyed` | Addresses of destroyed resources (at most 100).                     |
-| `stacks[].truncated` | `true` only when `replaced` or `destroyed` was capped at 100.       |
+| Field                | Meaning                                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `schema`             | Payload version (`1`). Fields are only added within a version.                                                |
+| `commit`             | PR head SHA at render time (not the merge commit that was planned).                                           |
+| `stacks[].stack`     | Stack name from `meta.json`.                                                                                  |
+| `stacks[].failed`    | `true` when the plan failed or its `plan.json` was unreadable; counts are then all zero.                      |
+| `stacks[].counts`    | `add`, `change`, `destroy`, `replace`, `import`, `forget`, `move`.                                            |
+| `stacks[].replaced`  | Addresses of replaced resources.                                                                              |
+| `stacks[].destroyed` | Addresses of delete-only resources (replacements are in `replaced`, not both).                                |
+| `stacks[].truncated` | `true` when the lists were capped at 100 each, or dropped to fit the payload size budget (20,000 characters). |
 
-`>` and `--` are written as `\u003e` and `\u002d` so a resource address cannot
-close the comment; `JSON.parse` returns the original text.
+List lengths can be below the counts: resources without an address are skipped
+and lists cap at 100. If the payload still doesn't fit the budget with the lists
+dropped, it is omitted entirely and the job logs a warning.
+
+`>`, `--`, U+2028 and U+2029 are written as unicode escapes so a resource
+address cannot close the comment; `JSON.parse` returns the original text.
 
 ```js
 const match = /<!-- tf-plan-report:data (\{.*\}) -->/.exec(comment.body)
