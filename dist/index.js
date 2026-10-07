@@ -35186,9 +35186,6 @@ function serialize(results, commit, includeLists) {
 /**
  * Resource addresses are PR-author controlled and could close the HTML comment
  * early, so `>` and `--` runs are written as unicode escapes.
- *
- * Returns undefined, with a warning, when even the lists-free payload exceeds
- * MAX_PAYLOAD_LENGTH.
  */
 function renderPayload(results, commit) {
     const full = serialize(results, commit, true);
