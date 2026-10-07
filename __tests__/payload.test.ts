@@ -211,12 +211,18 @@ describe('renderPayload', () => {
       expect(warning).not.toHaveBeenCalled()
     })
 
-    it('omits the payload with a warning naming the size when even the compact form overflows', () => {
+    it('posts the omitted marker with a warning when even the compact form overflows', () => {
       const stacks = Array.from({ length: 400 }, (_, i) =>
         stackResult({ name: `stack-${i}-${'n'.repeat(60)}` })
       )
 
-      expect(renderPayload(stacks, COMMIT)).toBeUndefined()
+      const payload = renderPayload(stacks, COMMIT)
+
+      expect(extract(payload)).toEqual({
+        schema: 1,
+        commit: COMMIT,
+        omitted: true
+      })
       expect(warning).toHaveBeenCalledWith(
         expect.stringMatching(/payload is \d+ chars/)
       )

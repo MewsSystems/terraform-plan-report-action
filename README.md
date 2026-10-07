@@ -96,10 +96,12 @@ consumers: read it instead of parsing the markdown.
 | `stacks[].replaced`  | Addresses of replaced resources.                                                                              |
 | `stacks[].destroyed` | Addresses of delete-only resources (replacements are in `replaced`, not both).                                |
 | `stacks[].truncated` | `true` when the lists were capped at 100 each, or dropped to fit the payload size budget (20,000 characters). |
+| `omitted`            | `true`, with no `stacks`, when even the list-free payload exceeds the size budget. Treat it as unreadable.    |
 
 List lengths can be below the counts: resources without an address are skipped
 and lists cap at 100. If the payload still doesn't fit the budget with the lists
-dropped, it is omitted entirely and the job logs a warning.
+dropped, the line carries only `schema`, `commit` and `omitted: true`, and the
+job logs a warning. No line at all means an older version of this action.
 
 `>`, `--`, U+2028 and U+2029 are written as unicode escapes so a resource
 address cannot close the comment; `JSON.parse` returns the original text.

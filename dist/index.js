@@ -35171,31 +35171,33 @@ function stackPayload(result, includeLists) {
         ...(truncated && { truncated })
     };
 }
-function serialize(results, commit, includeLists) {
-    const json = JSON.stringify({
-        schema: PAYLOAD_SCHEMA_VERSION,
-        commit,
-        stacks: results.map((r) => stackPayload(r, includeLists))
-    })
+/**
+ * Resource addresses are PR-author controlled and could close the HTML comment
+ * early, so `>` and `--` runs are written as unicode escapes.
+ */
+function serialize(data) {
+    const json = JSON.stringify({ schema: PAYLOAD_SCHEMA_VERSION, ...data })
         .replace(/>/g, '\\u003e')
         .replace(/-{2,}/g, (run) => '\\u002d'.repeat(run.length))
         .replace(/\u2028/g, '\\u2028')
         .replace(/\u2029/g, '\\u2029');
     return `<!-- ${PAYLOAD_MARKER} ${json} -->`;
 }
-/**
- * Resource addresses are PR-author controlled and could close the HTML comment
- * early, so `>` and `--` runs are written as unicode escapes.
- */
+function serializeStacks(results, commit, includeLists) {
+    return serialize({
+        commit,
+        stacks: results.map((r) => stackPayload(r, includeLists))
+    });
+}
 function renderPayload(results, commit) {
-    const full = serialize(results, commit, true);
+    const full = serializeStacks(results, commit, true);
     if (full.length <= MAX_PAYLOAD_LENGTH)
         return full;
-    const compact = serialize(results, commit, false);
+    const compact = serializeStacks(results, commit, false);
     if (compact.length <= MAX_PAYLOAD_LENGTH)
         return compact;
-    warning(`Machine-readable payload is ${compact.length} chars, over the ${MAX_PAYLOAD_LENGTH} budget even without address lists; omitting it from the comment.`);
-    return undefined;
+    warning(`Machine-readable payload is ${compact.length} chars, over the ${MAX_PAYLOAD_LENGTH} budget even without address lists; posting the omitted marker instead.`);
+    return serialize({ commit, omitted: true });
 }
 
 /**
