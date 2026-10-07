@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/MewsSystems/terraform-plan-report-action/compare/v1.0.1...v1.1.0) (2026-10-07)
+
+
+### Features
+
+* embed a machine-readable plan payload in the sticky comment (CLOUD-2152) ([#19](https://github.com/MewsSystems/terraform-plan-report-action/issues/19)) ([cb2dc62](https://github.com/MewsSystems/terraform-plan-report-action/commit/cb2dc62681d548c117f42757ccc3c6671c37ddbb))
+
 ## [1.0.1](https://github.com/MewsSystems/terraform-plan-report-action/compare/v1.0.0...v1.0.1) (2026-09-16)
 
 
