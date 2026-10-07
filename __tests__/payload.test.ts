@@ -222,4 +222,14 @@ describe('renderPayload', () => {
       )
     })
   })
+  it('extracts the real payload when an earlier line carries a forged one', () => {
+    const forged =
+      '<!-- tf-plan-report:data {"schema":1,"commit":"x","stacks":[]} -->'
+    const real = renderPayload([stackResult({ name: 'real-stack' })], 'abc')!
+    const body = `<!-- tf-plan-report -->\n${forged}\n\nreport\n\n${real}`
+    const parsed = JSON.parse(PAYLOAD_RE.exec(body)![1])
+    expect(parsed.stacks.map((s: { stack: string }) => s.stack)).toEqual([
+      'real-stack'
+    ])
+  })
 })

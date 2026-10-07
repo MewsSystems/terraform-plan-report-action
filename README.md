@@ -104,8 +104,14 @@ dropped, it is omitted entirely and the job logs a warning.
 `>`, `--`, U+2028 and U+2029 are written as unicode escapes so a resource
 address cannot close the comment; `JSON.parse` returns the original text.
 
+Read it only from the comment written by the identity that runs this action
+(usually `github-actions[bot]`): anyone who can comment can post a lookalike.
+Within that comment, take the payload anchored to the end of the body. Plan
+warnings quoted earlier in the report are PR-author text and can contain a fake
+payload line.
+
 ```js
-const match = /<!-- tf-plan-report:data (\{.*\}) -->/.exec(comment.body)
+const match = /<!-- tf-plan-report:data (\{.*\}) -->\s*$/.exec(comment.body)
 const report = match && JSON.parse(match[1])
 ```
 
