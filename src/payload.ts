@@ -1,33 +1,29 @@
 import * as core from '@actions/core'
-import type { PlanCounts, StackResult } from './types.js'
+import type { StackResult } from './types.js'
 
 export const PAYLOAD_MARKER = 'tf-plan-report:data'
 export const PAYLOAD_SCHEMA_VERSION = 1
 export const MAX_LISTED_ADDRESSES = 100
 export const MAX_PAYLOAD_LENGTH = 20000
 
-const NO_COUNTS: PlanCounts = {
-  add: 0,
-  change: 0,
-  destroy: 0,
-  replace: 0,
-  import: 0,
-  forget: 0,
-  move: 0
-}
-
 function stackPayload(result: StackResult, includeLists: boolean) {
   const overCap =
     result.replaced.length > MAX_LISTED_ADDRESSES ||
     result.destroyed.length > MAX_LISTED_ADDRESSES
-  const truncated = overCap || !includeLists
+  const droppedLists =
+    !includeLists && (result.replaced.length > 0 || result.destroyed.length > 0)
+  const truncated = overCap || droppedLists
   const cap = includeLists ? MAX_LISTED_ADDRESSES : 0
+  const replaced = result.replaced.slice(0, cap)
+  const destroyed = result.destroyed.slice(0, cap)
   return {
     stack: result.name,
-    failed: result.failed,
-    counts: result.counts ?? NO_COUNTS,
-    replaced: result.replaced.slice(0, cap),
-    destroyed: result.destroyed.slice(0, cap),
+    ...(result.failed && { failed: true }),
+    counts: Object.fromEntries(
+      Object.entries(result.counts ?? {}).filter(([, n]) => n > 0)
+    ),
+    ...(replaced.length > 0 && { replaced }),
+    ...(destroyed.length > 0 && { destroyed }),
     ...(truncated && { truncated })
   }
 }

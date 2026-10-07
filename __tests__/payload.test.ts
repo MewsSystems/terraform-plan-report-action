@@ -17,6 +17,7 @@ function extract(payload: string | undefined): {
   schema: number
   commit: string
   stacks: Record<string, unknown>[]
+  omitted?: boolean
 } {
   const match = payload === undefined ? null : PAYLOAD_RE.exec(payload)
   if (!match) throw new Error(`payload does not match marker: ${payload}`)
@@ -88,7 +89,6 @@ describe('renderPayload', () => {
 
     expect(stack).toEqual({
       stack: 'all-actions',
-      failed: false,
       counts: {
         add: 2,
         change: 1,
@@ -103,7 +103,13 @@ describe('renderPayload', () => {
     })
   })
 
-  it('marks a failed stack with zero counts and no addresses', async () => {
+  it('serialises a clean stack as just its name and empty counts', () => {
+    const payload = renderPayload([stackResult({ name: 'clean' })], COMMIT)
+
+    expect(payload).toContain('"stacks":[{"stack":"clean","counts":{}}]')
+  })
+
+  it('marks a failed stack with failed:true and no counts or addresses', async () => {
     const result = await analyzeFixture(
       'broken',
       '__fixtures__/scenarios/failed'
@@ -112,13 +118,7 @@ describe('renderPayload', () => {
     const [stack] = extract(renderPayload([result], COMMIT)).stacks
 
     expect(result.failed).toBe(true)
-    expect(stack).toMatchObject({
-      stack: 'broken',
-      failed: true,
-      counts: { add: 0, change: 0, destroy: 0, replace: 0 },
-      replaced: [],
-      destroyed: []
-    })
+    expect(stack).toEqual({ stack: 'broken', failed: true, counts: {} })
   })
 
   it('extracts with the exact regex the README documents', () => {
@@ -202,12 +202,52 @@ describe('renderPayload', () => {
       const { stacks } = extract(payload)
       expect(stacks).toHaveLength(5)
       for (const stack of stacks) {
-        expect(stack).toMatchObject({
-          replaced: [],
-          destroyed: [],
+        expect(stack).toEqual({
+          stack: expect.any(String),
+          counts: {},
           truncated: true
         })
       }
+      expect(warning).not.toHaveBeenCalled()
+    })
+
+    it('keeps a 262-stack fan-out with 173 addresses at the no-lists tier', () => {
+      const address = (i: number): string =>
+        `module.platform_${i}.azurerm_resource.${'r'.repeat(40)}`
+      const stacks = Array.from({ length: 262 }, (_, i) => {
+        const hasReplace = i < 110
+        const hasDestroy = i >= 110 && i < 173
+        return stackResult({
+          name: `tf-platform-cell-eu-${String(i).padStart(3, '0')}`,
+          counts: {
+            add: hasReplace || hasDestroy ? i % 2 : 1,
+            change: 0,
+            destroy: hasDestroy ? 1 : 0,
+            replace: hasReplace ? 1 : 0,
+            import: 0,
+            forget: 0,
+            move: 0
+          },
+          replaced: hasReplace ? [address(i)] : [],
+          destroyed: hasDestroy ? [address(i)] : []
+        })
+      })
+
+      const payload = renderPayload(stacks, COMMIT)
+
+      expect(payload!.length).toBeLessThanOrEqual(MAX_PAYLOAD_LENGTH)
+      const data = extract(payload)
+      expect(data.omitted).toBeUndefined()
+      expect(data.stacks).toHaveLength(262)
+      expect(data.stacks[0]).toEqual({
+        stack: 'tf-platform-cell-eu-000',
+        counts: { replace: 1 },
+        truncated: true
+      })
+      expect(data.stacks[200]).toEqual({
+        stack: 'tf-platform-cell-eu-200',
+        counts: { add: 1 }
+      })
       expect(warning).not.toHaveBeenCalled()
     })
 

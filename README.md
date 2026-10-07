@@ -86,18 +86,19 @@ consumers: read it instead of parsing the markdown.
 <!-- tf-plan-report:data {"schema":1,"commit":"<sha>","stacks":[...]} -->
 ```
 
-| Field                | Meaning                                                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `schema`             | Payload version (`1`). Fields are only added within a version.                                                |
-| `commit`             | PR head SHA at render time (not the merge commit that was planned).                                           |
-| `stacks[].stack`     | Stack name from `meta.json`.                                                                                  |
-| `stacks[].failed`    | `true` when the plan failed or its `plan.json` was unreadable; counts are then all zero.                      |
-| `stacks[].counts`    | `add`, `change`, `destroy`, `replace`, `import`, `forget`, `move`.                                            |
-| `stacks[].replaced`  | Addresses of replaced resources.                                                                              |
-| `stacks[].destroyed` | Addresses of delete-only resources (replacements are in `replaced`, not both).                                |
-| `stacks[].truncated` | `true` when the lists were capped at 100 each, or dropped to fit the payload size budget (20,000 characters). |
-| `omitted`            | `true`, with no `stacks`, when even the list-free payload exceeds the size budget. Treat it as unreadable.    |
+| Field                | Meaning                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `schema`             | Payload version (`1`). Fields are only added within a version.                                                      |
+| `commit`             | PR head SHA at render time (not the merge commit that was planned).                                                 |
+| `stacks[].stack`     | Stack name from `meta.json`.                                                                                        |
+| `stacks[].failed`    | `true` when the plan failed or its `plan.json` was unreadable; counts are then empty. Absent when false.            |
+| `stacks[].counts`    | Non-zero ops only: `add`, `change`, `destroy`, `replace`, `import`, `forget`, `move`.                               |
+| `stacks[].replaced`  | Addresses of replaced resources. Absent when empty.                                                                 |
+| `stacks[].destroyed` | Addresses of delete-only resources (replacements are in `replaced`, not both). Absent when empty.                   |
+| `stacks[].truncated` | `true` when a stack's lists were capped at 100 each, or dropped to fit the payload size budget (20,000 characters). |
+| `omitted`            | `true`, with no `stacks`, when even the list-free payload exceeds the size budget. Treat it as unreadable.          |
 
+An absent count is 0, an absent `failed` is false, and an absent list is empty.
 List lengths can be below the counts: resources without an address are skipped
 and lists cap at 100. If the payload still doesn't fit the budget with the lists
 dropped, the line carries only `schema`, `commit` and `omitted: true`, and the
