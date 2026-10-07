@@ -12,6 +12,7 @@ import {
   renderSummaryFallback
 } from './render.js'
 import { upsertComment } from './comment.js'
+import { renderPayload } from './payload.js'
 import type { ReportContext } from './types.js'
 
 /**
@@ -80,7 +81,8 @@ export async function run(): Promise<void> {
         pr.number,
         inputs.commentMarker,
         body,
-        fallback
+        fallback,
+        renderPayload(results, sha)
       )
       core.setOutput('comment-id', String(commentId))
       core.info(`Upserted PR comment ${commentId} on #${pr.number}.`)

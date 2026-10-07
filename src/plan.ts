@@ -26,9 +26,13 @@ export async function analyzeStack(stack: StackInput): Promise<StackResult> {
   if (errors.length > 0) failed = true
 
   let counts: PlanCounts | null = null
+  let replaced: string[] = []
+  let destroyed: string[] = []
   if (!failed) {
     try {
-      counts = countsFromPlanJson(await readFile(stack.plan_json, 'utf8'))
+      ;({ counts, replaced, destroyed } = analyzePlanJson(
+        await readFile(stack.plan_json, 'utf8')
+      ))
     } catch {
       failed = true
       readError =
@@ -40,6 +44,8 @@ export async function analyzeStack(stack: StackInput): Promise<StackResult> {
     name: stack.name,
     failed,
     counts,
+    replaced,
+    destroyed,
     planText,
     warnings,
     errors,
@@ -77,6 +83,7 @@ export function cleanPlanText(text: string): string {
 }
 
 interface ResourceChange {
+  address?: string
   // importing is nested inside change, not at the resource_change top level.
   change?: { actions?: string[]; importing?: unknown }
   // Present when a moved block renamed this resource (TF 1.1+).
@@ -89,6 +96,15 @@ interface PlanJson {
 
 /** Derive exact counts from `terraform show -json`. Uses Terraform's own action vocabulary. */
 export function countsFromPlanJson(raw: string): PlanCounts {
+  return analyzePlanJson(raw).counts
+}
+
+/** Counts plus the addresses behind the replace and destroy counts. */
+export function analyzePlanJson(raw: string): {
+  counts: PlanCounts
+  replaced: string[]
+  destroyed: string[]
+} {
   const json = JSON.parse(raw) as PlanJson
   const counts: PlanCounts = {
     add: 0,
@@ -99,6 +115,8 @@ export function countsFromPlanJson(raw: string): PlanCounts {
     forget: 0,
     move: 0
   }
+  const replaced: string[] = []
+  const destroyed: string[] = []
 
   for (const rc of json.resource_changes ?? []) {
     const actions = rc.change?.actions ?? []
@@ -112,6 +130,7 @@ export function countsFromPlanJson(raw: string): PlanCounts {
       counts.move++
     } else if (has('create') && has('delete')) {
       counts.replace++
+      if (rc.address != null) replaced.push(rc.address)
     } else if (actions.length === 1 && has('forget')) {
       // TF 1.7+: removed block with lifecycle { destroy = false }
       counts.forget++
@@ -121,11 +140,12 @@ export function countsFromPlanJson(raw: string): PlanCounts {
       counts.change++
     } else if (actions.length === 1 && has('delete')) {
       counts.destroy++
+      if (rc.address != null) destroyed.push(rc.address)
     }
     // no-op and read are not surfaced.
   }
 
-  return counts
+  return { counts, replaced, destroyed }
 }
 
 /**

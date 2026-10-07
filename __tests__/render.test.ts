@@ -35,6 +35,8 @@ function stack(over: Partial<StackResult>): StackResult {
     name: 'stack',
     failed: false,
     counts: { ...zeroCounts },
+    replaced: [],
+    destroyed: [],
     planText: 'No changes.',
     warnings: [],
     errors: [],

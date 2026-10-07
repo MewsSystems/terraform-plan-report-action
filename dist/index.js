@@ -34358,9 +34358,12 @@ async function analyzeStack(stack) {
     if (errors.length > 0)
         failed = true;
     let counts = null;
+    let replaced = [];
+    let destroyed = [];
     if (!failed) {
         try {
-            counts = countsFromPlanJson(await readFile(stack.plan_json, 'utf8'));
+            ;
+            ({ counts, replaced, destroyed } = analyzePlanJson(await readFile(stack.plan_json, 'utf8')));
         }
         catch {
             failed = true;
@@ -34372,6 +34375,8 @@ async function analyzeStack(stack) {
         name: stack.name,
         failed,
         counts,
+        replaced,
+        destroyed,
         planText,
         warnings,
         errors,
@@ -34405,8 +34410,8 @@ function cleanPlanText(text) {
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 }
-/** Derive exact counts from `terraform show -json`. Uses Terraform's own action vocabulary. */
-function countsFromPlanJson(raw) {
+/** Counts plus the addresses behind the replace and destroy counts. */
+function analyzePlanJson(raw) {
     const json = JSON.parse(raw);
     const counts = {
         add: 0,
@@ -34417,6 +34422,8 @@ function countsFromPlanJson(raw) {
         forget: 0,
         move: 0
     };
+    const replaced = [];
+    const destroyed = [];
     for (const rc of json.resource_changes ?? []) {
         const actions = rc.change?.actions ?? [];
         const has = (a) => actions.includes(a);
@@ -34430,6 +34437,8 @@ function countsFromPlanJson(raw) {
         }
         else if (has('create') && has('delete')) {
             counts.replace++;
+            if (rc.address != null)
+                replaced.push(rc.address);
         }
         else if (actions.length === 1 && has('forget')) {
             // TF 1.7+: removed block with lifecycle { destroy = false }
@@ -34443,10 +34452,12 @@ function countsFromPlanJson(raw) {
         }
         else if (actions.length === 1 && has('delete')) {
             counts.destroy++;
+            if (rc.address != null)
+                destroyed.push(rc.address);
         }
         // no-op and read are not surfaced.
     }
-    return counts;
+    return { counts, replaced, destroyed };
 }
 /**
  * Pull Terraform diagnostics out of plan text.
@@ -35088,16 +35099,19 @@ function chooseCommentBody(marker, body, fallback, maxLength = MAX_COMMENT_LENGT
  *
  * An oversized report is swapped for `fallback` (see `chooseCommentBody`) so it
  * still posts a comment instead of failing the whole action. The plan detail
- * always lives in the job summary, so nothing is lost.
+ * always lives in the job summary, so nothing is lost. The optional `payload`
+ * is appended after that choice and reserved for in the cap, so it survives the
+ * fallback swap.
  */
-async function upsertComment(token, prNumber, marker, body, fallback) {
+async function upsertComment(token, prNumber, marker, body, fallback, payload) {
     const octokit = getOctokit(token);
     const { owner, repo } = context.repo;
-    const chosen = chooseCommentBody(marker, body, fallback);
+    const payloadSuffix = payload === undefined ? '' : `\n${payload}`;
+    const chosen = chooseCommentBody(marker, body, fallback, MAX_COMMENT_LENGTH - payloadSuffix.length);
     if (chosen.truncated) {
         warning(`Comment body is ${`${marker}\n${body}`.length} chars, over GitHub's ${MAX_COMMENT_LENGTH} cap; posting the compact fallback instead. See the job summary for the full report.`);
     }
-    const fullBody = `${marker}\n${chosen.body}`;
+    const fullBody = `${marker}\n${chosen.body}${payloadSuffix}`;
     const existingId = await findComment(octokit, owner, repo, prNumber, marker);
     if (existingId !== undefined) {
         await octokit.rest.issues.updateComment({
@@ -35131,6 +35145,47 @@ async function findComment(octokit, owner, repo, prNumber, marker) {
         if (data.length < 100)
             return undefined;
     }
+}
+
+const PAYLOAD_MARKER = 'tf-plan-report:data';
+const PAYLOAD_SCHEMA_VERSION = 1;
+const MAX_LISTED_ADDRESSES = 100;
+const NO_COUNTS = {
+    add: 0,
+    change: 0,
+    destroy: 0,
+    replace: 0,
+    import: 0,
+    forget: 0,
+    move: 0
+};
+function stackPayload(result) {
+    const truncated = result.replaced.length > MAX_LISTED_ADDRESSES ||
+        result.destroyed.length > MAX_LISTED_ADDRESSES;
+    return {
+        stack: result.name,
+        failed: result.failed,
+        counts: result.counts ?? NO_COUNTS,
+        replaced: result.replaced.slice(0, MAX_LISTED_ADDRESSES),
+        destroyed: result.destroyed.slice(0, MAX_LISTED_ADDRESSES),
+        ...(truncated && { truncated })
+    };
+}
+/**
+ * A hidden HTML comment carrying the plan outcome as JSON, for automated
+ * consumers of the sticky comment. `>` and `--` runs are written as unicode
+ * escapes because resource addresses are PR-author controlled and could
+ * otherwise close the HTML comment early; JSON.parse restores them.
+ */
+function renderPayload(results, commit) {
+    const json = JSON.stringify({
+        schema: PAYLOAD_SCHEMA_VERSION,
+        commit,
+        stacks: results.map(stackPayload)
+    })
+        .replace(/>/g, '\\u003e')
+        .replace(/-{2,}/g, (run) => '\\u002d'.repeat(run.length));
+    return `<!-- ${PAYLOAD_MARKER} ${json} -->`;
 }
 
 /**
@@ -35186,7 +35241,7 @@ async function run() {
         if (pr?.number && inputs.githubToken) {
             const body = renderComment(results, ctx, runUrl, inputs.sections);
             const fallback = renderCommentFallback(results, ctx, runUrl);
-            const commentId = await upsertComment(inputs.githubToken, pr.number, inputs.commentMarker, body, fallback);
+            const commentId = await upsertComment(inputs.githubToken, pr.number, inputs.commentMarker, body, fallback, renderPayload(results, sha));
             setOutput('comment-id', String(commentId));
             info(`Upserted PR comment ${commentId} on #${pr.number}.`);
         }

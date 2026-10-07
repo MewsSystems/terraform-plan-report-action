@@ -93,6 +93,10 @@ export interface StackResult {
   failed: boolean
   /** Exact counts from plan_json, or null when the stack failed to plan. */
   counts: PlanCounts | null
+  /** Addresses of resources the plan replaces (empty when the stack failed). */
+  replaced: string[]
+  /** Addresses of resources the plan destroys (empty when the stack failed). */
+  destroyed: string[]
   /** Raw `terraform show -no-color` text, for the per-stack plan block. */
   planText: string
   /** Cleaned Terraform warning diagnostics. */

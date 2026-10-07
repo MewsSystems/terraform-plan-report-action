@@ -76,6 +76,35 @@ additively (`order`, `priority`, …) later without changing anything else.
 > `terraform show` on a saved plan file silently drops check-block warnings; the
 > live output preserves them.
 
+### Machine-readable payload
+
+The last line of the sticky comment is a hidden HTML comment, invisible when
+rendered, that carries the plan outcome as JSON. It is a contract for automated
+consumers: read it instead of parsing the markdown.
+
+```text
+<!-- tf-plan-report:data {"schema":1,"commit":"<sha>","stacks":[...]} -->
+```
+
+| Field                | Meaning                                                             |
+| -------------------- | ------------------------------------------------------------------- |
+| `schema`             | Payload version (`1`). Fields are only added within a version.      |
+| `commit`             | Full SHA the report was rendered for.                               |
+| `stacks[].stack`     | Stack name from `meta.json`.                                        |
+| `stacks[].failed`    | `true` when the stack failed to plan; its counts are then all zero. |
+| `stacks[].counts`    | `add`, `change`, `destroy`, `replace`, `import`, `forget`, `move`.  |
+| `stacks[].replaced`  | Addresses of replaced resources (at most 100).                      |
+| `stacks[].destroyed` | Addresses of destroyed resources (at most 100).                     |
+| `stacks[].truncated` | `true` only when `replaced` or `destroyed` was capped at 100.       |
+
+`>` and `--` are written as `\u003e` and `\u002d` so a resource address cannot
+close the comment; `JSON.parse` returns the original text.
+
+```js
+const match = /<!-- tf-plan-report:data (\{.*\}) -->/.exec(comment.body)
+const report = match && JSON.parse(match[1])
+```
+
 ## Content model
 
 1. **Terraform-native core** (opt-in via `show`): `summary`, `plan`, `warnings`,

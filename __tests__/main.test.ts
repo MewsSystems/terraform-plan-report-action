@@ -73,7 +73,10 @@ describe('run', () => {
       13,
       '<!-- tf-plan-report -->',
       expect.stringContaining('Terraform Plan'),
-      expect.stringContaining('too large to render as a PR comment')
+      expect.stringContaining('too large to render as a PR comment'),
+      expect.stringMatching(
+        /^<!-- tf-plan-report:data \{"schema":1,"commit":"deadbeef000","stacks":\[/
+      )
     )
     expect(core.setOutput).toHaveBeenCalledWith('comment-id', '999')
   })
