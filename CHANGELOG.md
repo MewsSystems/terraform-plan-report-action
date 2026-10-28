@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/MewsSystems/terraform-plan-report-action/compare/v1.1.0...v1.1.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **deps:** bump bundled undici to 6.29.1 (CLOUD-2197) ([#22](https://github.com/MewsSystems/terraform-plan-report-action/issues/22)) ([28f80b0](https://github.com/MewsSystems/terraform-plan-report-action/commit/28f80b0468027f9ae55618001b1aa156b3f9b17c))
+
 ## [1.1.0](https://github.com/MewsSystems/terraform-plan-report-action/compare/v1.0.1...v1.1.0) (2026-10-07)
 
 
