@@ -117,6 +117,17 @@ describe('parseWarning', () => {
     })
   })
 
+  it('counts a bullet whose address root is interrupted by an invisible character', () => {
+    for (const bullet of ['aws_x\u200B.y', 'module\u200B.a.b']) {
+      const w = withBullets(bullet)
+      expect(parseWarning(w)).toMatchObject({
+        addresses: [],
+        omittedAddresses: 1
+      })
+      expect(payloadWarnings([w]).truncated).toBe(true)
+    }
+  })
+
   it('does not rewrite a format character into a different valid address', () => {
     const parsed = parseWarning(withBullets('aws_instance.web["a\u200Bb"]'))
     expect(parsed.addresses).toEqual([])

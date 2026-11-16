@@ -48,7 +48,10 @@ function clip(text: string, max: number): string {
 
 function parseAddressBullet(line: string): string | null | undefined {
   const bullet = line.trim()
-  if (!ADDRESS_LIKE_BULLET.test(bullet.slice(0, MAX_ADDRESS_LINE_LENGTH))) {
+  const detectable = bullet
+    .slice(0, MAX_ADDRESS_LINE_LENGTH * 2)
+    .replace(INVISIBLE_CHARS, '')
+  if (!ADDRESS_LIKE_BULLET.test(detectable.slice(0, MAX_ADDRESS_LINE_LENGTH))) {
     return undefined
   }
   if (bullet.length > MAX_ADDRESS_LINE_LENGTH || INVISIBLE_CHAR.test(bullet)) {
