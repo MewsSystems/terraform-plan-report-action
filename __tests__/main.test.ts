@@ -73,7 +73,10 @@ describe('run', () => {
       'tok',
       13,
       '<!-- tf-plan-report -->',
-      expect.stringContaining('Terraform Plan'),
+      [
+        expect.stringContaining('Terraform Plan'),
+        expect.stringContaining('Terraform Plan')
+      ],
       expect.stringContaining('too large to render as a PR comment'),
       expect.stringMatching(new RegExp(`^${PAYLOAD_EXTRACT_SOURCE}$`))
     )

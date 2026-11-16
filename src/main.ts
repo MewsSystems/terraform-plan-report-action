@@ -74,7 +74,9 @@ export async function run(): Promise<void> {
     core.setOutput('summary-url', runUrl)
 
     if (pr?.number && inputs.githubToken) {
-      const body = renderComment(results, ctx, runUrl, inputs.sections)
+      const body = [true, false].map((includeWarnings) =>
+        renderComment(results, ctx, runUrl, inputs.sections, includeWarnings)
+      )
       const fallback = renderCommentFallback(results, ctx, runUrl)
       const commentId = await upsertComment(
         inputs.githubToken,

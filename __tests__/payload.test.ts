@@ -99,7 +99,8 @@ describe('renderPayload', () => {
         move: 1
       },
       replaced: ['azurerm_eventhub.events', 'azurerm_container_app.worker'],
-      destroyed: ['azurerm_key_vault.legacy']
+      destroyed: ['azurerm_key_vault.legacy'],
+      warnings: [{ summary: 'Argument is deprecated', addresses: [] }]
     })
   })
 
@@ -277,5 +278,87 @@ describe('renderPayload', () => {
     expect(parsed.stacks.map((s: { stack: string }) => s.stack)).toEqual([
       'real-stack'
     ])
+  })
+
+  describe('warnings', () => {
+    const FORGET = [
+      'Warning: Some objects will no longer be managed by Terraform',
+      '',
+      'the following objects, but it will not delete them:',
+      ' - module.a.b["private"].c.d'
+    ].join('\n')
+
+    it('adds summary and addresses per stack and keeps schema 1', () => {
+      const data = extract(
+        renderPayload([stackResult({ warnings: [FORGET] })], COMMIT)
+      )
+
+      expect(data.schema).toBe(1)
+      expect(data.stacks[0].warnings).toEqual([
+        {
+          summary: 'Some objects will no longer be managed by Terraform',
+          addresses: ['module.a.b["private"].c.d']
+        }
+      ])
+      expect(data.stacks[0].truncated).toBeUndefined()
+      expect(data.stacks[0].warningsTruncated).toBeUndefined()
+    })
+
+    it('omits the field when a stack has no warnings', () => {
+      const [stack] = extract(renderPayload([stackResult({})], COMMIT)).stacks
+      expect(stack).not.toHaveProperty('warnings')
+    })
+
+    it('caps addresses per warning and flags truncated', () => {
+      const lines = Array.from({ length: 12 }, (_, i) => ` - a_b.r${i}`)
+      const text = ['Warning: Many', '', ...lines].join('\n')
+
+      const [stack] = extract(
+        renderPayload([stackResult({ warnings: [text] })], COMMIT)
+      ).stacks
+
+      expect(
+        (stack.warnings as { addresses: string[] }[])[0].addresses
+      ).toHaveLength(10)
+      expect(stack.warningsTruncated).toBe(true)
+      expect(stack.truncated).toBeUndefined()
+    })
+
+    it('drops warnings before the replaced and destroyed lists when over budget', () => {
+      const address = `aws_x.${'a'.repeat(100)}`
+      const lines = Array.from({ length: 10 }, (_, i) => ` - ${address}${i}`)
+      const warnings = Array.from({ length: 5 }, () =>
+        ['Warning: Big', '', ...lines].join('\n')
+      )
+      const results = Array.from({ length: 5 }, (_, i) =>
+        stackResult({
+          name: `s${i}`,
+          replaced: ['aws_y.r'],
+          destroyed: ['aws_y.d'],
+          warnings
+        })
+      )
+
+      const data = extract(renderPayload(results, COMMIT))
+
+      expect(data.stacks[0]).toMatchObject({
+        replaced: ['aws_y.r'],
+        destroyed: ['aws_y.d'],
+        warningsTruncated: true
+      })
+      expect(data.stacks[0]).not.toHaveProperty('warnings')
+      expect(data.stacks[0]).not.toHaveProperty('truncated')
+    })
+
+    it('keeps hostile summary text from closing the hidden comment', () => {
+      const payload = renderPayload(
+        [stackResult({ warnings: ['Warning: --> <script> x'] })],
+        COMMIT
+      )
+      expect(payload.slice(0, -3)).not.toContain('-->')
+      expect(extract(payload).stacks[0].warnings).toEqual([
+        { summary: '--> <script> x', addresses: [] }
+      ])
+    })
   })
 })

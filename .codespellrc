@@ -1,5 +1,6 @@
 [codespell]
 # Skip generated/vendored files: lockfile integrity hashes and the bundled
-# dist trip false positives. planText is a deliberate variable name.
+# dist trip false positives. planText is a deliberate variable name; applyable
+# is a key in Terraform's plan JSON.
 skip = ./package-lock.json,./dist,./node_modules,./coverage,./badges,./.git
-ignore-words-list = plantext
+ignore-words-list = plantext,applyable

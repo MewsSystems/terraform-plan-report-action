@@ -9,6 +9,7 @@ import type {
   SectionStatus,
   StackResult
 } from './types.js'
+import { MAX_COMMENT_WARNINGS_LENGTH, renderStackWarnings } from './warnings.js'
 
 /** Roll totals up across all stacks. */
 export function aggregate(results: StackResult[]): Aggregate {
@@ -160,7 +161,8 @@ export function renderComment(
   results: StackResult[],
   ctx: ReportContext,
   summaryUrl: string,
-  sections: Section[] = []
+  sections: Section[] = [],
+  includeWarnings = true
 ): string {
   const agg = aggregate(results)
   const out: string[] = [
@@ -178,6 +180,8 @@ export function renderComment(
   )
   const opsLegend = operationsLegend(results)
   if (opsLegend) out.push('', opsLegend)
+  const warningDetails = includeWarnings ? commentWarnings(results) : ''
+  if (warningDetails) out.push('', '### Warnings', '', warningDetails)
   const checks = checksTable(results, sections)
   if (checks) {
     // The comment has no per-section detail, so the glossary rides under the
@@ -196,6 +200,34 @@ export function renderComment(
   // box — CAUTION and IMPORTANT are the ones that need the visual weight.
   out.push('', footerLine(ctx, agg, true, summaryUrl))
   return out.join('\n')
+}
+
+function commentWarnings(results: StackResult[]): string {
+  const stacks = results.filter((r) => r.warnings.length > 0)
+  const blocks: string[] = []
+  let length = 0
+  for (const [i, r] of stacks.entries()) {
+    let block = markdownDetails(
+      escapeHtml(r.name),
+      renderStackWarnings(r.warnings)
+    )
+    if (length + block.length > MAX_COMMENT_WARNINGS_LENGTH) {
+      if (i > 0) break
+      block = markdownDetails(
+        escapeHtml(r.name),
+        renderStackWarnings(r.warnings, false)
+      )
+    }
+    length += block.length
+    blocks.push(block)
+  }
+  const omitted = stacks.length - blocks.length
+  if (omitted > 0) {
+    blocks.push(
+      `${omitted} ${plural(omitted, 'stack')} with warnings not shown: see the job summary.`
+    )
+  }
+  return blocks.join('\n\n')
 }
 
 /**

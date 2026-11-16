@@ -8,22 +8,31 @@ import * as github from '@actions/github'
 export const MAX_COMMENT_LENGTH = 65536
 
 /**
- * Decide which body to post. The marker is prepended to the body (and counts
- * toward the cap), so when `marker + body` would exceed GitHub's 64 KiB limit
- * the body is swapped for `fallback` (a short pointer to the job summary). Pure,
- * so the local preview can exercise the exact decision the action ships.
- * Returns the chosen body and whether it was swapped.
+ * Decide which body to post. `body` is one candidate or several, richest
+ * first. The marker is prepended to the body (and counts toward the cap), so
+ * the first candidate that fits under GitHub's 64 KiB limit wins; when none
+ * fits the body is swapped for `fallback` (a short pointer to the job
+ * summary). Pure, so the local preview can exercise the exact decision the
+ * action ships. Returns the chosen body, the index of the candidate it came
+ * from (0 when `fallback` was swapped in) and whether it was swapped.
  */
 export function chooseCommentBody(
   marker: string,
-  body: string,
+  body: string | string[],
   fallback?: string,
   maxLength: number = MAX_COMMENT_LENGTH
-): { body: string; truncated: boolean } {
-  const overCap = `${marker}\n${body}`.length > maxLength
-  if (overCap && fallback !== undefined)
-    return { body: fallback, truncated: true }
-  return { body, truncated: false }
+): { body: string; index: number; truncated: boolean } {
+  const candidates = [body].flat()
+  if (candidates.length === 0) {
+    throw new Error('chooseCommentBody needs at least one candidate body')
+  }
+  const index = candidates.findIndex(
+    (c) => `${marker}\n${c}`.length <= maxLength
+  )
+  if (index !== -1) return { body: candidates[index], index, truncated: false }
+  if (fallback !== undefined)
+    return { body: fallback, index: 0, truncated: true }
+  return { body: candidates[0], index: 0, truncated: false }
 }
 
 /**
@@ -39,7 +48,7 @@ export async function upsertComment(
   token: string,
   prNumber: number,
   marker: string,
-  body: string,
+  body: string | string[],
   fallback?: string,
   payload?: string
 ): Promise<number> {
@@ -54,7 +63,11 @@ export async function upsertComment(
   )
   if (chosen.truncated) {
     core.warning(
-      `Comment body is ${`${marker}\n${body}`.length} chars, over GitHub's ${MAX_COMMENT_LENGTH} cap; posting the compact fallback instead. See the job summary for the full report.`
+      `Comment body is over GitHub's ${MAX_COMMENT_LENGTH} cap; posting the compact fallback instead. See the job summary for the full report.`
+    )
+  } else if (chosen.index > 0) {
+    core.warning(
+      `Comment body is over GitHub's ${MAX_COMMENT_LENGTH} cap; posting a slimmer version of it. See the job summary for the full report.`
     )
   }
   const fullBody = `${marker}\n${chosen.body}${payloadSuffix}`
