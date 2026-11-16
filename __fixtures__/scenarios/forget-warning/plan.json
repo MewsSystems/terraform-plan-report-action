@@ -1,0 +1,129 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.12.1",
+  "planned_values": {
+    "root_module": {
+      "child_modules": [
+        {
+          "resources": [
+            {
+              "address": "module.container_app.terraform_data.post_creation_update",
+              "mode": "managed",
+              "type": "terraform_data",
+              "name": "post_creation_update",
+              "provider_name": "terraform.io/builtin/terraform",
+              "schema_version": 0,
+              "sensitive_values": false
+            },
+            {
+              "address": "module.container_app.terraform_data.update_keeper",
+              "mode": "managed",
+              "type": "terraform_data",
+              "name": "update_keeper",
+              "provider_name": "terraform.io/builtin/terraform",
+              "schema_version": 0,
+              "sensitive_values": false
+            }
+          ],
+          "address": "module.container_app"
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "module.container_app.terraform_data.post_creation_update",
+      "module_address": "module.container_app",
+      "mode": "managed",
+      "type": "terraform_data",
+      "name": "post_creation_update",
+      "provider_name": "terraform.io/builtin/terraform",
+      "change": {
+        "actions": ["forget"],
+        "before": {
+          "id": "c97e95a7-6929-1821-5720-c4ace5fd3614",
+          "input": "b",
+          "output": "b",
+          "triggers_replace": null
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      },
+      "action_reason": "delete_because_no_resource_config"
+    },
+    {
+      "address": "module.container_app.terraform_data.update_keeper",
+      "module_address": "module.container_app",
+      "mode": "managed",
+      "type": "terraform_data",
+      "name": "update_keeper",
+      "provider_name": "terraform.io/builtin/terraform",
+      "change": {
+        "actions": ["forget"],
+        "before": {
+          "id": "18a14074-d5e0-617f-80f7-3ab1faeea8de",
+          "input": "a",
+          "output": "a",
+          "triggers_replace": null
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      },
+      "action_reason": "delete_because_no_resource_config"
+    }
+  ],
+  "prior_state": {
+    "format_version": "1.0",
+    "terraform_version": "1.12.1",
+    "values": {
+      "root_module": {
+        "child_modules": [
+          {
+            "resources": [
+              {
+                "address": "module.container_app.terraform_data.post_creation_update",
+                "mode": "managed",
+                "type": "terraform_data",
+                "name": "post_creation_update",
+                "provider_name": "terraform.io/builtin/terraform",
+                "schema_version": 0,
+                "values": {
+                  "id": "c97e95a7-6929-1821-5720-c4ace5fd3614",
+                  "input": "b",
+                  "output": "b",
+                  "triggers_replace": null
+                },
+                "sensitive_values": {}
+              },
+              {
+                "address": "module.container_app.terraform_data.update_keeper",
+                "mode": "managed",
+                "type": "terraform_data",
+                "name": "update_keeper",
+                "provider_name": "terraform.io/builtin/terraform",
+                "schema_version": 0,
+                "values": {
+                  "id": "18a14074-d5e0-617f-80f7-3ab1faeea8de",
+                  "input": "a",
+                  "output": "a",
+                  "triggers_replace": null
+                },
+                "sensitive_values": {}
+              }
+            ],
+            "address": "module.container_app"
+          }
+        ]
+      }
+    }
+  },
+  "configuration": { "root_module": {} },
+  "timestamp": "2026-11-16T09:17:14Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false
+}

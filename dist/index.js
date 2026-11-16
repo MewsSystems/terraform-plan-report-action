@@ -34736,6 +34736,103 @@ function extractDiagnostics(text) {
     return { warnings, errors };
 }
 
+const MAX_WARNING_ADDRESSES = 10;
+const MAX_WARNINGS_PER_STACK = 5;
+const MAX_WARNING_SUMMARY_LENGTH = 200;
+const MAX_ADDRESS_LENGTH = 300;
+const MAX_COMMENT_WARNINGS_LENGTH = 6000;
+const WARNING_PREFIX = /^Warning:\s*/;
+const MAX_ADDRESS_LINE_LENGTH = MAX_ADDRESS_LENGTH + 100;
+const INDEX_KEY = String.raw `(?:\[[^\]\n<>\x60]*\])*`;
+const ADDRESS_SEGMENT = String.raw `[A-Za-z_][\w-]*${INDEX_KEY}`;
+const ADDRESS_ROOT = String.raw `(?:module|data|[A-Za-z][A-Za-z0-9]*_[\w-]*)${INDEX_KEY}`;
+const ADDRESS_LINE = new RegExp(String.raw `^\s*[-*]\s+(${ADDRESS_ROOT}(?:\.${ADDRESS_SEGMENT})+)\s*$`);
+const FILE_NAME = /\.(?:tf|tfvars|json|hcl|ya?ml|md|txt)$/i;
+const MORE_SIMILAR = /\(and (\d{1,6}|one) more similar warnings? elsewhere\)/;
+const INVISIBLE_CHARS = /[\p{Cc}\p{Cf}\u2028\u2029]/gu;
+const ASCII_PUNCTUATION = /[!-/:-@[-`{-~]/g;
+function codePointLength(text) {
+    return [...text].length;
+}
+function clip(text, max) {
+    const points = [...text];
+    return points.length > max ? `${points.slice(0, max - 1).join('')}…` : text;
+}
+function parseWarning(text) {
+    const [firstLine = '', ...rest] = text.split('\n');
+    const lines = rest.map((line) => line.replace(INVISIBLE_CHARS, ' '));
+    const addresses = lines
+        .map((line) => line.length > MAX_ADDRESS_LINE_LENGTH
+        ? undefined
+        : ADDRESS_LINE.exec(line)?.[1])
+        .filter((a) => a !== undefined && !FILE_NAME.test(a));
+    const similar = lines
+        .map((line) => MORE_SIMILAR.exec(line)?.[1])
+        .find(Boolean);
+    return {
+        summary: firstLine
+            .replace(WARNING_PREFIX, '')
+            .replace(INVISIBLE_CHARS, ' ')
+            .trim(),
+        addresses,
+        ...(similar !== undefined && {
+            moreSimilar: similar === 'one' ? 1 : Number(similar)
+        })
+    };
+}
+function payloadWarnings(texts) {
+    const parsed = texts.map(parseWarning);
+    let truncated = parsed.length > MAX_WARNINGS_PER_STACK;
+    const warnings = parsed.slice(0, MAX_WARNINGS_PER_STACK).map((p) => {
+        const summary = clip(p.summary, MAX_WARNING_SUMMARY_LENGTH);
+        const fitting = p.addresses.filter((a) => codePointLength(a) <= MAX_ADDRESS_LENGTH);
+        const addresses = fitting.slice(0, MAX_WARNING_ADDRESSES);
+        if (summary !== p.summary || addresses.length < p.addresses.length) {
+            truncated = true;
+        }
+        return {
+            summary,
+            addresses,
+            ...(p.moreSimilar !== undefined && { moreSimilar: p.moreSimilar })
+        };
+    });
+    return { warnings, truncated };
+}
+// GitHub links mentions even when the @ is backslash-escaped.
+function escapeMarkdown(text) {
+    return text.replace(ASCII_PUNCTUATION, (ch) => ch === '@' ? '@\u200b' : `\\${ch}`);
+}
+function inlineCode(text) {
+    const longestRun = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length));
+    const fence = '`'.repeat(longestRun + 1);
+    return `${fence} ${text} ${fence}`;
+}
+function renderWarning(p, withAddresses) {
+    const summary = clip(p.summary, MAX_WARNING_SUMMARY_LENGTH) || 'Warning';
+    const lines = [`- **${escapeMarkdown(summary)}**`];
+    if (withAddresses) {
+        for (const address of p.addresses.slice(0, MAX_WARNING_ADDRESSES)) {
+            lines.push(`  - ${inlineCode(clip(address, MAX_ADDRESS_LENGTH))}`);
+        }
+        const more = p.addresses.length - MAX_WARNING_ADDRESSES;
+        if (more > 0)
+            lines.push(`  - and ${more} more`);
+    }
+    if (p.moreSimilar !== undefined) {
+        lines.push(`  - and ${p.moreSimilar} more similar elsewhere`);
+    }
+    return lines;
+}
+function renderStackWarnings(texts, withAddresses = true) {
+    const lines = texts
+        .slice(0, MAX_WARNINGS_PER_STACK)
+        .flatMap((text) => renderWarning(parseWarning(text), withAddresses));
+    const more = texts.length - MAX_WARNINGS_PER_STACK;
+    if (more > 0)
+        lines.push(`- and ${more} more ${more === 1 ? 'warning' : 'warnings'}`);
+    return lines.join('\n');
+}
+
 /** Roll totals up across all stacks. */
 function aggregate(results) {
     const totals = {
@@ -34870,7 +34967,7 @@ function renderFullReport(results, show, ctx, sections = []) {
     return out.join('\n');
 }
 /** The compact view: posted as the sticky PR comment, links to the full report. */
-function renderComment(results, ctx, summaryUrl, sections = []) {
+function renderComment(results, ctx, summaryUrl, sections = [], includeWarnings = true) {
     const agg = aggregate(results);
     const out = [
         `## Terraform Plan · ${ctx.title}`,
@@ -34883,6 +34980,9 @@ function renderComment(results, ctx, summaryUrl, sections = []) {
     const opsLegend = operationsLegend(results);
     if (opsLegend)
         out.push('', opsLegend);
+    const warningDetails = includeWarnings ? commentWarnings(results) : '';
+    if (warningDetails)
+        out.push('', '### Warnings', '', warningDetails);
     const checks = checksTable(results, sections);
     if (checks) {
         // The comment has no per-section detail, so the glossary rides under the
@@ -34903,6 +35003,26 @@ function renderComment(results, ctx, summaryUrl, sections = []) {
     // box — CAUTION and IMPORTANT are the ones that need the visual weight.
     out.push('', footerLine(ctx, agg, true, summaryUrl));
     return out.join('\n');
+}
+function commentWarnings(results) {
+    const stacks = results.filter((r) => r.warnings.length > 0);
+    const blocks = [];
+    let length = 0;
+    for (const [i, r] of stacks.entries()) {
+        let block = markdownDetails(escapeHtml(r.name), renderStackWarnings(r.warnings));
+        if (length + block.length > MAX_COMMENT_WARNINGS_LENGTH) {
+            if (i > 0)
+                break;
+            block = markdownDetails(escapeHtml(r.name), renderStackWarnings(r.warnings, false));
+        }
+        length += block.length;
+        blocks.push(block);
+    }
+    const omitted = stacks.length - blocks.length;
+    if (omitted > 0) {
+        blocks.push(`${omitted} ${plural(omitted, 'stack')} with warnings not shown: see the job summary.`);
+    }
+    return blocks.join('\n\n');
 }
 /**
  * Minimal replacement body used when the compact view would blow GitHub's
@@ -35315,17 +35435,25 @@ function escapeHtml(s) {
  */
 const MAX_COMMENT_LENGTH = 65536;
 /**
- * Decide which body to post. The marker is prepended to the body (and counts
- * toward the cap), so when `marker + body` would exceed GitHub's 64 KiB limit
- * the body is swapped for `fallback` (a short pointer to the job summary). Pure,
- * so the local preview can exercise the exact decision the action ships.
- * Returns the chosen body and whether it was swapped.
+ * Decide which body to post. `body` is one candidate or several, richest
+ * first. The marker is prepended to the body (and counts toward the cap), so
+ * the first candidate that fits under GitHub's 64 KiB limit wins; when none
+ * fits the body is swapped for `fallback` (a short pointer to the job
+ * summary). Pure, so the local preview can exercise the exact decision the
+ * action ships. Returns the chosen body, the index of the candidate it came
+ * from (0 when `fallback` was swapped in) and whether it was swapped.
  */
 function chooseCommentBody(marker, body, fallback, maxLength = MAX_COMMENT_LENGTH) {
-    const overCap = `${marker}\n${body}`.length > maxLength;
-    if (overCap && fallback !== undefined)
-        return { body: fallback, truncated: true };
-    return { body, truncated: false };
+    const candidates = [body].flat();
+    if (candidates.length === 0) {
+        throw new Error('chooseCommentBody needs at least one candidate body');
+    }
+    const index = candidates.findIndex((c) => `${marker}\n${c}`.length <= maxLength);
+    if (index !== -1)
+        return { body: candidates[index], index, truncated: false };
+    if (fallback !== undefined)
+        return { body: fallback, index: 0, truncated: true };
+    return { body: candidates[0], index: 0, truncated: false };
 }
 /**
  * Find the sticky comment by its marker and PATCH it, or POST a new one.
@@ -35342,7 +35470,10 @@ async function upsertComment(token, prNumber, marker, body, fallback, payload) {
     const payloadSuffix = payload === undefined ? '' : `\n\n${payload}`;
     const chosen = chooseCommentBody(marker, body, fallback, MAX_COMMENT_LENGTH - payloadSuffix.length);
     if (chosen.truncated) {
-        warning(`Comment body is ${`${marker}\n${body}`.length} chars, over GitHub's ${MAX_COMMENT_LENGTH} cap; posting the compact fallback instead. See the job summary for the full report.`);
+        warning(`Comment body is over GitHub's ${MAX_COMMENT_LENGTH} cap; posting the compact fallback instead. See the job summary for the full report.`);
+    }
+    else if (chosen.index > 0) {
+        warning(`Comment body is over GitHub's ${MAX_COMMENT_LENGTH} cap; posting a slimmer version of it. See the job summary for the full report.`);
     }
     const fullBody = `${marker}\n${chosen.body}${payloadSuffix}`;
     const existingId = await findComment(octokit, owner, repo, prNumber, marker);
@@ -35384,7 +35515,7 @@ const PAYLOAD_MARKER = 'tf-plan-report:data';
 const PAYLOAD_SCHEMA_VERSION = 1;
 const MAX_LISTED_ADDRESSES = 100;
 const MAX_PAYLOAD_LENGTH = 20000;
-function stackPayload(result, includeLists) {
+function stackPayload(result, { includeLists, includeWarnings }) {
     const overCap = result.replaced.length > MAX_LISTED_ADDRESSES ||
         result.destroyed.length > MAX_LISTED_ADDRESSES;
     const droppedLists = !includeLists && (result.replaced.length > 0 || result.destroyed.length > 0);
@@ -35392,17 +35523,22 @@ function stackPayload(result, includeLists) {
     const cap = includeLists ? MAX_LISTED_ADDRESSES : 0;
     const replaced = result.replaced.slice(0, cap);
     const destroyed = result.destroyed.slice(0, cap);
+    const shown = includeWarnings
+        ? payloadWarnings(result.warnings)
+        : { warnings: [], truncated: result.warnings.length > 0 };
     return {
         stack: result.name,
         ...(result.failed && { failed: true }),
         counts: Object.fromEntries(Object.entries(result.counts ?? {}).filter(([, n]) => n > 0)),
         ...(replaced.length > 0 && { replaced }),
         ...(destroyed.length > 0 && { destroyed }),
-        ...(truncated && { truncated })
+        ...(shown.warnings.length > 0 && { warnings: shown.warnings }),
+        ...(truncated && { truncated }),
+        ...(shown.truncated && { warningsTruncated: true })
     };
 }
 /**
- * Resource addresses are PR-author controlled and could close the HTML comment
+ * Plan-derived text is PR-author controlled and could close the HTML comment
  * early, so `>` and `--` runs are written as unicode escapes.
  */
 function serialize(data) {
@@ -35413,20 +35549,25 @@ function serialize(data) {
         .replace(/\u2029/g, '\\u2029');
     return `<!-- ${PAYLOAD_MARKER} ${json} -->`;
 }
-function serializeStacks(results, commit, includeLists) {
+const DETAIL_TIERS = [
+    { includeLists: true, includeWarnings: true },
+    { includeLists: true, includeWarnings: false },
+    { includeLists: false, includeWarnings: false }
+];
+function serializeStacks(results, commit, detail) {
     return serialize({
         commit,
-        stacks: results.map((r) => stackPayload(r, includeLists))
+        stacks: results.map((r) => stackPayload(r, detail))
     });
 }
 function renderPayload(results, commit) {
-    const full = serializeStacks(results, commit, true);
-    if (full.length <= MAX_PAYLOAD_LENGTH)
-        return full;
-    const compact = serializeStacks(results, commit, false);
-    if (compact.length <= MAX_PAYLOAD_LENGTH)
-        return compact;
-    warning(`Machine-readable payload is ${compact.length} chars, over the ${MAX_PAYLOAD_LENGTH} budget even without address lists; posting the omitted marker instead.`);
+    let smallest = '';
+    for (const detail of DETAIL_TIERS) {
+        smallest = serializeStacks(results, commit, detail);
+        if (smallest.length <= MAX_PAYLOAD_LENGTH)
+            return smallest;
+    }
+    warning(`Machine-readable payload is ${smallest.length} chars, over the ${MAX_PAYLOAD_LENGTH} budget even without address lists; posting the omitted marker instead.`);
     return serialize({ commit, omitted: true });
 }
 
@@ -35481,7 +35622,7 @@ async function run() {
         setOutput('failed-stacks', String(agg.failed));
         setOutput('summary-url', runUrl);
         if (pr?.number && inputs.githubToken) {
-            const body = renderComment(results, ctx, runUrl, inputs.sections);
+            const body = [true, false].map((includeWarnings) => renderComment(results, ctx, runUrl, inputs.sections, includeWarnings));
             const fallback = renderCommentFallback(results, ctx, runUrl);
             const commentId = await upsertComment(inputs.githubToken, pr.number, inputs.commentMarker, body, fallback, renderPayload(results, sha));
             setOutput('comment-id', String(commentId));

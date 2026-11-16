@@ -7,6 +7,7 @@ import {
   renderFullReport,
   renderSummaryFallback
 } from '../src/render.js'
+import { MAX_COMMENT_LENGTH } from '../src/comment.js'
 import type { ReportContext, Section, StackResult } from '../src/types.js'
 
 const ctx: ReportContext = {
@@ -514,5 +515,101 @@ describe('chooseSummaryBody', () => {
     ])
     expect(chosen.label).toBe('minimal')
     expect(chosen.truncated).toBe(true)
+  })
+})
+
+describe('warnings in the comment', () => {
+  const warningText = [
+    'Warning: Some objects will no longer be managed by Terraform',
+    '',
+    'the following objects, but it will not delete them:',
+    ' - module.a.b["private"].c.d',
+    ' - module.a.b["private"].c.e'
+  ].join('\n')
+
+  it('lists summary and addresses in a collapsed block per stack', () => {
+    const body = renderComment(
+      [stack({ name: 'demo', warnings: [warningText] })],
+      ctx,
+      ctx.runUrl
+    )
+    expect(body).toContain('### Warnings')
+    expect(body).toContain('<details><summary>demo</summary>')
+    expect(body).toContain(
+      '**Some objects will no longer be managed by Terraform**'
+    )
+    expect(body).toContain('` module.a.b["private"].c.d `')
+  })
+
+  it('has no Warnings section without warnings or when excluded', () => {
+    expect(renderComment([stack({})], ctx, ctx.runUrl)).not.toContain(
+      '### Warnings'
+    )
+    expect(
+      renderComment(
+        [stack({ warnings: [warningText] })],
+        ctx,
+        ctx.runUrl,
+        [],
+        false
+      )
+    ).not.toContain('### Warnings')
+  })
+
+  const manyStacks = Array.from({ length: 60 }, (_, i) =>
+    stack({
+      name: `stack-${i}`,
+      warnings: [warningText, warningText, warningText]
+    })
+  )
+
+  it('stops contiguously once the length budget is spent and points to the job summary', () => {
+    const body = renderComment(manyStacks, ctx, ctx.runUrl)
+    const shown = body.match(/<summary>stack-(\d+)<\/summary>/g) ?? []
+    expect(shown.length).toBeGreaterThan(0)
+    expect(shown.length).toBeLessThan(60)
+    expect(body).toContain(
+      `${60 - shown.length} stacks with warnings not shown: see the job summary.`
+    )
+    expect(body.length).toBeLessThan(MAX_COMMENT_LENGTH)
+  })
+
+  it('always shows the first stack, as summaries only when its addresses do not fit', () => {
+    const lines = Array.from(
+      { length: 10 },
+      (_, i) => ` - a_b.${'x'.repeat(290)}${i}`
+    )
+    const huge = Array.from({ length: 5 }, () =>
+      ['Warning: Big', '', ...lines].join('\n')
+    )
+    const body = renderComment(
+      [
+        stack({ name: 'first', warnings: huge }),
+        stack({ name: 'second', warnings: huge })
+      ],
+      ctx,
+      ctx.runUrl
+    )
+    expect(body).toContain('<summary>first</summary>')
+    expect(body).toContain('**Big**')
+    expect(body).not.toContain('xxxxxxxxxx')
+    expect(body).not.toContain('<summary>second</summary>')
+    expect(body).toContain('1 stack with warnings not shown')
+  })
+
+  it('escapes hostile warning text so it cannot close the block or ping', () => {
+    const body = renderComment(
+      [
+        stack({
+          name: 'demo',
+          warnings: ['Warning: </details> @user\n\n - a_b.c']
+        })
+      ],
+      ctx,
+      ctx.runUrl
+    )
+    expect(body).not.toContain('@user')
+    expect(body).toContain('\\<\\/details\\>')
+    expect(body.match(/<\/details>/g)).toHaveLength(1)
   })
 })

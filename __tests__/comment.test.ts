@@ -29,6 +29,7 @@ describe('chooseCommentBody', () => {
   it('keeps the body when it fits', () => {
     expect(chooseCommentBody(MARKER, 'small', 'fallback')).toEqual({
       body: 'small',
+      index: 0,
       truncated: false
     })
   })
@@ -37,6 +38,7 @@ describe('chooseCommentBody', () => {
     const huge = 'x'.repeat(MAX_COMMENT_LENGTH + 1)
     expect(chooseCommentBody(MARKER, huge, 'fallback')).toEqual({
       body: 'fallback',
+      index: 0,
       truncated: true
     })
   })
@@ -51,8 +53,40 @@ describe('chooseCommentBody', () => {
     const huge = 'x'.repeat(MAX_COMMENT_LENGTH + 1)
     expect(chooseCommentBody(MARKER, huge)).toEqual({
       body: huge,
+      index: 0,
       truncated: false
     })
+  })
+})
+
+describe('chooseCommentBody with several candidates', () => {
+  it('takes the richest candidate that fits', () => {
+    const rich = 'x'.repeat(50)
+    expect(chooseCommentBody(MARKER, [rich, 'slim'], 'fb', 40)).toEqual({
+      body: 'slim',
+      index: 1,
+      truncated: false
+    })
+  })
+
+  it('swaps to the fallback when no candidate fits', () => {
+    expect(
+      chooseCommentBody(MARKER, ['x'.repeat(60), 'y'.repeat(60)], 'fb', 40)
+    ).toEqual({ body: 'fb', index: 0, truncated: true })
+  })
+})
+
+describe('chooseCommentBody edge cases', () => {
+  it('reports the index of the chosen candidate', () => {
+    expect(
+      chooseCommentBody(MARKER, ['x'.repeat(50), 'slim'], 'fb', 40).index
+    ).toBe(1)
+  })
+
+  it('throws when given no candidates', () => {
+    expect(() => chooseCommentBody(MARKER, [], 'fb')).toThrow(
+      /at least one candidate/
+    )
   })
 })
 
@@ -108,6 +142,20 @@ describe('upsertComment', () => {
       expect.objectContaining({ body: `${MARKER}\nsmall report` })
     )
     expect(warning).not.toHaveBeenCalled()
+  })
+
+  it('posts the slimmer candidate and warns when the richest is over the cap', async () => {
+    listComments.mockResolvedValueOnce({ data: [] })
+    const rich = 'x'.repeat(MAX_COMMENT_LENGTH + 1)
+
+    await upsertComment('tok', 13, MARKER, [rich, 'slim'], 'fallback')
+
+    expect(createComment).toHaveBeenCalledWith(
+      expect.objectContaining({ body: `${MARKER}\nslim` })
+    )
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining('slimmer version')
+    )
   })
 
   it('posts the oversized body unchanged when no fallback is given', async () => {

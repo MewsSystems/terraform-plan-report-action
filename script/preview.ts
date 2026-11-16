@@ -82,7 +82,9 @@ const cap = process.env.PREVIEW_COMMENT_CAP
   : undefined
 const chosen = chooseCommentBody(
   marker,
-  renderComment(results, ctx, ctx.runUrl, sections),
+  [true, false].map((includeWarnings) =>
+    renderComment(results, ctx, ctx.runUrl, sections, includeWarnings)
+  ),
   renderCommentFallback(results, ctx, ctx.runUrl),
   cap
 )

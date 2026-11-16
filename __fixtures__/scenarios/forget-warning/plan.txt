@@ -1,0 +1,38 @@
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+
+Terraform will perform the following actions:
+
+ # module.container_app.terraform_data.post_creation_update will no longer be managed by Terraform, but will not be destroyed
+ # (destroy = false is set in the configuration)
+ . resource "terraform_data" "post_creation_update" {
+        id     = "c97e95a7-6929-1821-5720-c4ace5fd3614"
+        # (2 unchanged attributes hidden)
+    }
+
+ # module.container_app.terraform_data.update_keeper will no longer be managed by Terraform, but will not be destroyed
+ # (destroy = false is set in the configuration)
+ . resource "terraform_data" "update_keeper" {
+        id     = "18a14074-d5e0-617f-80f7-3ab1faeea8de"
+        # (2 unchanged attributes hidden)
+    }
+
+Plan: 0 to add, 0 to change, 0 to destroy.
+
+Warning: Some objects will no longer be managed by Terraform
+
+If you apply this plan, Terraform will discard its tracking information for
+the following objects, but it will not delete them:
+ - module.container_app.terraform_data.update_keeper
+ - module.container_app.terraform_data.post_creation_update
+
+After applying this plan, Terraform will no longer manage these objects. You
+will need to import them into Terraform to manage them again.
+
+─────────────────────────────────────────────────────────────────────────────
+
+Saved the plan to: plan.tfplan
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "plan.tfplan"
