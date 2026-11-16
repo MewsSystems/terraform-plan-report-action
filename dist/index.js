@@ -34743,11 +34743,12 @@ const MAX_ADDRESS_LENGTH = 300;
 const MAX_COMMENT_WARNINGS_LENGTH = 6000;
 const WARNING_PREFIX = /^Warning:\s*/;
 const MAX_ADDRESS_LINE_LENGTH = MAX_ADDRESS_LENGTH + 100;
-const INDEX_KEY = String.raw `(?:\[[^\]\n<>\x60]*\])*`;
+const INDEX_KEY = String.raw `(?:\[(?:"(?:[^"\\\n<>\x60]|\\[^\n<>\x60])*"|\d+)\])*`;
 const ADDRESS_SEGMENT = String.raw `[A-Za-z_][\w-]*${INDEX_KEY}`;
 const ADDRESS_ROOT = String.raw `(?:module|data|[A-Za-z][A-Za-z0-9]*_[\w-]*)${INDEX_KEY}`;
 const ADDRESS_LINE = new RegExp(String.raw `^\s*[-*]\s+(${ADDRESS_ROOT}(?:\.${ADDRESS_SEGMENT})+)\s*$`);
-const FILE_NAME = /\.(?:tf|tfvars|json|hcl|ya?ml|md|txt)$/i;
+const ADDRESS_LIKE_BULLET = /^[-*]\s+(?:module|data|[A-Za-z][A-Za-z0-9]*_[\w-]*)[.[]/;
+const INVISIBLE_CHAR = /[\p{Cc}\p{Cf}\u2028\u2029]/u;
 const MORE_SIMILAR = /\(and (\d{1,6}|one) more similar warnings? elsewhere\)/;
 const INVISIBLE_CHARS = /[\p{Cc}\p{Cf}\u2028\u2029]/gu;
 const ASCII_PUNCTUATION = /[!-/:-@[-`{-~]/g;
@@ -34758,23 +34759,27 @@ function clip(text, max) {
     const points = [...text];
     return points.length > max ? `${points.slice(0, max - 1).join('')}…` : text;
 }
+function parseAddressBullet(line) {
+    const bullet = line.trim();
+    if (!ADDRESS_LIKE_BULLET.test(bullet.slice(0, MAX_ADDRESS_LINE_LENGTH))) {
+        return undefined;
+    }
+    if (bullet.length > MAX_ADDRESS_LINE_LENGTH || INVISIBLE_CHAR.test(bullet)) {
+        return null;
+    }
+    return ADDRESS_LINE.exec(bullet)?.[1] ?? null;
+}
 function parseWarning(text) {
     const [firstLine = '', ...rest] = text.split('\n');
-    const lines = rest.map((line) => line.replace(INVISIBLE_CHARS, ' '));
-    const addresses = lines
-        .map((line) => line.length > MAX_ADDRESS_LINE_LENGTH
-        ? undefined
-        : ADDRESS_LINE.exec(line)?.[1])
-        .filter((a) => a !== undefined && !FILE_NAME.test(a));
-    const similar = lines
-        .map((line) => MORE_SIMILAR.exec(line)?.[1])
-        .find(Boolean);
+    const bullets = rest.map(parseAddressBullet);
+    const similar = rest.map((line) => MORE_SIMILAR.exec(line)?.[1]).find(Boolean);
     return {
         summary: firstLine
             .replace(WARNING_PREFIX, '')
             .replace(INVISIBLE_CHARS, ' ')
             .trim(),
-        addresses,
+        addresses: bullets.filter((a) => typeof a === 'string'),
+        omittedAddresses: bullets.filter((a) => a === null).length,
         ...(similar !== undefined && {
             moreSimilar: similar === 'one' ? 1 : Number(similar)
         })
@@ -34787,7 +34792,9 @@ function payloadWarnings(texts) {
         const summary = clip(p.summary, MAX_WARNING_SUMMARY_LENGTH);
         const fitting = p.addresses.filter((a) => codePointLength(a) <= MAX_ADDRESS_LENGTH);
         const addresses = fitting.slice(0, MAX_WARNING_ADDRESSES);
-        if (summary !== p.summary || addresses.length < p.addresses.length) {
+        if (summary !== p.summary ||
+            p.omittedAddresses > 0 ||
+            addresses.length < p.addresses.length) {
             truncated = true;
         }
         return {
@@ -34814,7 +34821,8 @@ function renderWarning(p, withAddresses) {
         for (const address of p.addresses.slice(0, MAX_WARNING_ADDRESSES)) {
             lines.push(`  - ${inlineCode(clip(address, MAX_ADDRESS_LENGTH))}`);
         }
-        const more = p.addresses.length - MAX_WARNING_ADDRESSES;
+        const more = Math.max(0, p.addresses.length - MAX_WARNING_ADDRESSES) +
+            p.omittedAddresses;
         if (more > 0)
             lines.push(`  - and ${more} more`);
     }

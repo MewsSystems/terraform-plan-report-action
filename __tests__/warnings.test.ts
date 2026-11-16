@@ -33,7 +33,8 @@ describe('parseWarning', () => {
   it('reads the summary and listed addresses', () => {
     expect(parseWarning(FORGET_WARNING)).toEqual({
       summary: 'Some objects will no longer be managed by Terraform',
-      addresses: [ADDR_PRIVATE, ADDR_KEEPER]
+      addresses: [ADDR_PRIVATE, ADDR_KEEPER],
+      omittedAddresses: 0
     })
   })
 
@@ -49,7 +50,8 @@ describe('parseWarning', () => {
     const { warnings } = extractDiagnostics(framed)
     expect(parseWarning(warnings[0])).toEqual({
       summary: 'Some objects will no longer be managed by Terraform',
-      addresses: [ADDR_KEEPER]
+      addresses: [ADDR_KEEPER],
+      omittedAddresses: 0
     })
   })
 
@@ -59,7 +61,8 @@ describe('parseWarning', () => {
     )
     expect(parseWarning(warnings[0])).toEqual({
       summary: 'Check block assertion failed',
-      addresses: []
+      addresses: [],
+      omittedAddresses: 0
     })
   })
 
@@ -77,12 +80,47 @@ describe('parseWarning', () => {
     const w = withBullets(
       'main.tf',
       'terraform.tfvars',
-      'my_vars.tfvars',
       'e.g. see the docs',
       'run terraform fmt.',
       'Foo.bar'
     )
-    expect(parseWarning(w).addresses).toEqual([])
+    expect(parseWarning(w)).toMatchObject({
+      addresses: [],
+      omittedAddresses: 0
+    })
+  })
+
+  it('accepts addresses whose last segment looks like a file extension', () => {
+    const addresses = [
+      'aws_s3_bucket.tf',
+      'terraform_data.json',
+      'module.worker.aws_instance.txt'
+    ]
+    expect(parseWarning(withBullets(...addresses)).addresses).toEqual(addresses)
+  })
+
+  it('accepts an index key containing a closing bracket', () => {
+    const address = 'aws_instance.web["prod]blue"]'
+    expect(parseWarning(withBullets(address)).addresses).toEqual([address])
+  })
+
+  it('counts address-like bullets it rejects instead of dropping them silently', () => {
+    const w = withBullets(
+      'aws_x.ok',
+      'aws_x.y["a\u200Bb"]',
+      'aws_x.y["<b>"]',
+      `aws_x.${'b'.repeat(500)}`
+    )
+    expect(parseWarning(w)).toMatchObject({
+      addresses: ['aws_x.ok'],
+      omittedAddresses: 3
+    })
+  })
+
+  it('does not rewrite a format character into a different valid address', () => {
+    const parsed = parseWarning(withBullets('aws_instance.web["a\u200Bb"]'))
+    expect(parsed.addresses).toEqual([])
+    expect(parsed.omittedAddresses).toBe(1)
   })
 
   it('handles CRLF line endings', () => {
@@ -108,6 +146,20 @@ describe('hostile input', () => {
     expect(Date.now() - started).toBeLessThan(500)
   })
 
+  it('matches pathological quoted index keys quickly', () => {
+    const started = Date.now()
+    parseWarning(
+      withBullets(
+        `a_b.c["${'\\'.repeat(190)}`,
+        `a_b.c["${'"'.repeat(380)}`,
+        `a_b.c["${'\\"'.repeat(190)}x`,
+        `a_b.c${'["a"]'.repeat(75)}!`,
+        `a_b.c[${'"'.repeat(385)}`
+      )
+    )
+    expect(Date.now() - started).toBeLessThan(500)
+  })
+
   it('rejects addresses that could carry HTML or a forged marker', () => {
     const w = withBullets(
       'a_b.c["<!-- tf-plan-report:data {} -->"]',
@@ -117,6 +169,15 @@ describe('hostile input', () => {
     const md = renderStackWarnings([w])
     expect(parseWarning(w).addresses).toEqual([])
     expect(md).not.toContain('tf-plan-report')
+  })
+
+  it('flags warningsTruncated when an address line was omitted', () => {
+    expect(
+      payloadWarnings([withBullets('aws_x.y["a\u200Bb"]', 'aws_x.ok')])
+    ).toMatchObject({
+      truncated: true,
+      warnings: [{ addresses: ['aws_x.ok'] }]
+    })
   })
 
   it('does not set moreSimilar from an overflowing count', () => {
@@ -149,7 +210,8 @@ describe('real Terraform output', () => {
       addresses: [
         'module.container_app.terraform_data.update_keeper',
         'module.container_app.terraform_data.post_creation_update'
-      ]
+      ],
+      omittedAddresses: 0
     })
   })
 })
@@ -255,6 +317,13 @@ describe('renderStackWarnings', () => {
     expect(md).toContain('and 2 more')
     expect(md).toContain('and 4 more similar')
     expect(md).toContain('- and 1 more warning')
+  })
+
+  it('counts omitted address lines in "and N more"', () => {
+    const md = renderStackWarnings([
+      withBullets('aws_x.ok', 'aws_x.y["a\u200Bb"]', 'aws_x.y["<b>"]')
+    ])
+    expect(md).toContain('and 2 more')
   })
 
   it('omits addresses when asked for summaries only', () => {
