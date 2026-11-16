@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/MewsSystems/terraform-plan-report-action/compare/v1.1.1...v1.2.0) (2026-11-16)
+
+
+### Features
+
+* show each plan warning's text in the sticky comment (CLOUD-3231) ([#24](https://github.com/MewsSystems/terraform-plan-report-action/issues/24)) ([26c98ab](https://github.com/MewsSystems/terraform-plan-report-action/commit/26c98abe3155f3650586207b13c3b322a0b81029))
+
 ## [1.1.1](https://github.com/MewsSystems/terraform-plan-report-action/compare/v1.1.0...v1.1.1) (2026-10-28)
 
 
