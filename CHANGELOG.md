@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/MewsSystems/terraform-plan-report-action/compare/v1.2.0...v1.2.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* count replaces on imported and moved resources (PESD-4846) ([#26](https://github.com/MewsSystems/terraform-plan-report-action/issues/26)) ([7befd63](https://github.com/MewsSystems/terraform-plan-report-action/commit/7befd634ae538fe76442a84f1f36ed206fdaa6f1))
+
 ## [1.2.0](https://github.com/MewsSystems/terraform-plan-report-action/compare/v1.1.1...v1.2.0) (2026-11-16)
 
 
