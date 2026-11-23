@@ -34662,15 +34662,11 @@ function analyzePlanJson(raw) {
     for (const rc of json.resource_changes ?? []) {
         const actions = rc.change?.actions ?? [];
         const has = (a) => actions.includes(a);
-        if (rc.change?.importing != null) {
-            // TF 1.5+: importing is inside change{}. Real plans use no-op (exact match) or update (diff).
+        if (rc.change?.importing != null)
             counts.import++;
-        }
-        else if (rc.previous_address != null) {
-            // TF 1.1+: moved block — previous_address in resource_changes, not a top-level array.
+        if (rc.previous_address != null)
             counts.move++;
-        }
-        else if (has('create') && has('delete')) {
+        if (has('create') && has('delete')) {
             counts.replace++;
             if (rc.address != null)
                 replaced.push(rc.address);

@@ -76,13 +76,63 @@ describe('countsFromPlanJson', () => {
     expect(countsFromPlanJson(json)).toEqual({ ...zeroCounts, import: 1 })
   })
 
-  it('counts import when importing marker present with update (config diff)', () => {
+  it('counts import and change when an imported resource has a config diff', () => {
     const json = JSON.stringify({
       resource_changes: [
         { change: { actions: ['update'], importing: { id: 'existing-id' } } }
       ]
     })
-    expect(countsFromPlanJson(json)).toEqual({ ...zeroCounts, import: 1 })
+    expect(countsFromPlanJson(json)).toEqual({
+      ...zeroCounts,
+      import: 1,
+      change: 1
+    })
+  })
+
+  it('counts replace on an imported resource as import and replace', () => {
+    const json = JSON.stringify({
+      resource_changes: [
+        {
+          address: 'octopusdeploy_project_scheduled_trigger.prod',
+          change: {
+            actions: ['delete', 'create'],
+            importing: { id: 'Projects-1/ProjectTriggers-1' }
+          }
+        },
+        {
+          address: 'octopusdeploy_project_scheduled_trigger.prod_cbd',
+          change: {
+            actions: ['create', 'delete'],
+            importing: { id: 'Projects-1/ProjectTriggers-2' }
+          }
+        }
+      ]
+    })
+    expect(analyzePlanJson(json)).toEqual({
+      counts: { ...zeroCounts, import: 2, replace: 2 },
+      replaced: [
+        'octopusdeploy_project_scheduled_trigger.prod',
+        'octopusdeploy_project_scheduled_trigger.prod_cbd'
+      ],
+      destroyed: []
+    })
+  })
+
+  it('counts replace on a moved resource as move and replace', () => {
+    const json = JSON.stringify({
+      resource_changes: [
+        {
+          address: 'module.b.resource.x',
+          previous_address: 'module.a.resource.x',
+          change: { actions: ['delete', 'create'] }
+        }
+      ]
+    })
+    expect(analyzePlanJson(json)).toEqual({
+      counts: { ...zeroCounts, move: 1, replace: 1 },
+      replaced: ['module.b.resource.x'],
+      destroyed: []
+    })
   })
 
   it('counts forget actions (TF 1.7+ removed with destroy=false)', () => {
